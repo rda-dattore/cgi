@@ -28,9 +28,10 @@ struct StringEntry {
 };
 struct ParameterData {
   struct Data {
-    Data() : code(),format_code(),format(),long_name(),units() {}
+    Data() : codes(),format_codes(),format(),long_name(),units() {}
 
-    std::string code,format_code,format,long_name,units;
+    std::vector<std::string> codes,format_codes;
+    std::string format,long_name,units;
   };
   ParameterData() : key(),data(nullptr) {}
 
@@ -176,13 +177,15 @@ void decodeRequestData()
 	  ParameterData pdata;
 	  xmlutils::ParameterMapper parameter_mapper;
 	  pdata.key=strutils::substitute(parameter_mapper.getShortName(row[0],key)," ","_");
-	  pdata.data.reset(new ParameterData::Data);
-	  pdata.data->code=key;
-	  pdata.data->format_code=*param.format_code;
-	  pdata.data->format=row[0];
-	  pdata.data->long_name=parameter_mapper.getDescription(row[0],key);
-	  pdata.data->units=parameter_mapper.getUnits(row[0],key);
-	  dap_args.parameters.insert(pdata);
+	  if (!dap_args.parameters.found(pdata.key,pdata)) {
+	    pdata.data.reset(new ParameterData::Data);
+	    dap_args.parameters.insert(pdata);
+	    pdata.data->format=row[0];
+	    pdata.data->long_name=parameter_mapper.getDescription(row[0],key);
+	    pdata.data->units=parameter_mapper.getUnits(row[0],key);
+	  }
+	  pdata.data->codes.emplace_back(key);
+	  pdata.data->format_codes.emplace_back(*param.format_code);
 	}
     }
     else {
@@ -684,7 +687,7 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
 	  }
 	  if (has_levels) {
 	    MySQL::LocalQuery query2;
-	    query2.set("select l.dim_name,l.dim_size from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID where g.ID = '"+dap_args.ID+"' and g.param = '"+row[0]+"') as x) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
+	    query2.set("select l.dim_name,l.dim_size from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+row[0]+"') as x) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
 	    if (query2.submit(server) < 0) {
 		std::cerr << "opendap printDDS(4a): " << query2.error() << " for " << query2.show() << std::endl;
 		dapError("500 Internal Server Error","Database error printDDS(4a)");
@@ -801,7 +804,7 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
 		  }
 		}
 		if (hasLevels(server,query)) {
-		  query.set("select l.dim_name,l.dim_size from (select x.ID,x.uID as uID,count(x.uID) as dim_size from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID where g.ID = '"+dap_args.ID+"' and g.param = '"+key+"') as x) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
+		  query.set("select l.dim_name,l.dim_size from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+key+"') as x) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
 		  if (query.submit(server) == 0 && query.fetch_row(row)) {
 		    di.length=std::stoi(row[1]);
 		    di.start=0;
@@ -1303,13 +1306,16 @@ void printParameters(std::string& format,xmlutils::LevelMapper& level_mapper)
 	}
 	xmlutils::ParameterMapper parameter_mapper;
 	pe.key=strutils::substitute(parameter_mapper.getShortName(*fe.format,key)," ","_");
-	pe.data.reset(new ParameterEntry::Data);
-	pe.data->format=*fe.format;
-	pe.data->long_name=parameter_mapper.getDescription(*fe.format,key);
-	pe.data->units=parameter_mapper.getUnits(*fe.format,key);
-	parameter_table.insert(pe);
+	if (!parameter_table.found(pe.key,pe)) {
+	  pe.data.reset(new ParameterEntry::Data);
+	  pe.data->format=*fe.format;
+	  pe.data->long_name=parameter_mapper.getDescription(*fe.format,key);
+	  pe.data->units=parameter_mapper.getUnits(*fe.format,key);
+	  parameter_table.insert(pe);
+	}
     }
   }
+  format=pe.data->format;
   query.set("select distinct param from metautil.custom_dap_grid_index where ID = '"+dap_args.ID+"' and time_slice_index = 0");
   if (query.submit(server) < 0) {
     std::cerr << "opendap printDAS(1): " << query.error() << " for " << query.show() << std::endl;
@@ -1318,7 +1324,7 @@ void printParameters(std::string& format,xmlutils::LevelMapper& level_mapper)
   while (query.fetch_row(row)) {
     parameter_table.found(row[0].substr(0,row[0].rfind("_")),pe);
     MySQL::LocalQuery query2;
-    query2.set("select l.level_key,y.level_values from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size,group_concat(x.level_code separator '!') as level_values from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+row[0]+"') as x) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
+    query2.set("select l.level_key,y.level_codes from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size,group_concat(x.level_code separator '!') as level_codes from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+row[0]+"') as x) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
     if (query2.submit(server) < 0) {
 	std::cerr << "opendap printDAS(1a): " << query2.error() << " for " << query2.show() << std::endl;
 	dapError("500 Internal Server Error","Database error printDAS(1a)");
@@ -1328,37 +1334,38 @@ void printParameters(std::string& format,xmlutils::LevelMapper& level_mapper)
 	if (row2[0].length() == 0) {
 	  MySQL::LocalQuery query3;
 	  MySQL::Row row3;
-	  query3.set("select distinct l.type,l.map,l.value from metautil.custom_dap_grid_index as g left join WGrML.levels as l on l.code = g.level_code where g.param = '"+row[0]+"' and g.ID = '"+dap_args.ID+"' and g.time_slice_index = 0");
+	  query3.set("select distinct l.type,l.map,l.value,f.format from metautil.custom_dap_grid_index as g left join WGrML.levels as l on l.code = g.level_code left join WGrML.ds"+dap_args.dsnum2+"_webfiles as w on w.code = g.webID_code left join WGrML.formats as f on f.code = w.format_code where g.param = '"+row[0]+"' and g.ID = '"+dap_args.ID+"' and g.time_slice_index = 0");
 	  if (query3.submit(server) < 0) {
 	    std::cerr << "opendap printDAS(1b): " << query2.error() << " for " << query2.show() << std::endl;
 	    dapError("500 Internal Server Error","Database error printDAS(1b)");
 	  }
 	  while (query3.fetch_row(row3)) {
-	    auto lunits=level_mapper.getUnits(pe.data->format,row3[0],row3[1]);
+	    auto lunits=level_mapper.getUnits(row3[3],row3[0],row3[1]);
 	    if (lunits.length() > 0) {
-		printParameterAttributes(pe.data->format,strutils::substitute(row[0]," ","_"),pe.data->long_name+" at "+row3[2]+" "+lunits,pe.data->units);
+		printParameterAttributes(row3[3],strutils::substitute(row[0]," ","_"),pe.data->long_name+" at "+row3[2]+" "+lunits,pe.data->units);
 	    }
 	    else {
 		std::string ldes="";
 		if (std::regex_search(row3[0],std::regex("-")) && std::regex_search(row3[2],std::regex(","))) {
-		  ldes+=" in "+level_mapper.getDescription(pe.data->format,row3[0],row3[1]);
+		  ldes+=" in "+level_mapper.getDescription(row3[3],row3[0],row3[1]);
 		  auto sp=strutils::split(row3[0],"-");
 		  auto sp2=strutils::split(row3[2],",");
-		  ldes+=" - top: "+sp2[1]+" "+level_mapper.getUnits(pe.data->format,sp[1],row3[1])+" bottom: "+sp2[0]+" "+level_mapper.getUnits(pe.data->format,sp[0],row3[1]);
+		  ldes+=" - top: "+sp2[1]+" "+level_mapper.getUnits(row3[3],sp[1],row3[1])+" bottom: "+sp2[0]+" "+level_mapper.getUnits(row3[3],sp[0],row3[1]);
 		}
 		else {
-		  ldes+=" at "+level_mapper.getDescription(pe.data->format,row3[0],row3[1]);
+		  ldes+=" at "+level_mapper.getDescription(row3[3],row3[0],row3[1]);
 		  if (row3[2] != "0") {
 		    ldes+=" "+row3[2];
 		  }
 		}
-		printParameterAttributes(pe.data->format,strutils::substitute(row[0]," ","_"),pe.data->long_name+ldes,pe.data->units);
+		printParameterAttributes(row3[3],strutils::substitute(row[0]," ","_"),pe.data->long_name+ldes,pe.data->units);
 	    }
+	    format=row3[3];
 	  }
 	}
 	else {
 	  auto sp=strutils::split(row2[0],":");
-	  auto ldes=level_mapper.getDescription(pe.data->format,sp[1],sp[0]);
+	  auto ldes=level_mapper.getDescription(format,sp[1],sp[0]);
 	  sp=strutils::split(row2[1],"!");
 	  auto sdum=" at ";
 	  for (const auto& p : sp) {
@@ -1366,11 +1373,10 @@ void printParameters(std::string& format,xmlutils::LevelMapper& level_mapper)
 		sdum=" in ";
 	    }
 	  }
-	  printParameterAttributes(pe.data->format,strutils::substitute(row[0]," ","_"),pe.data->long_name+sdum+ldes,pe.data->units);
+	  printParameterAttributes(format,strutils::substitute(row[0]," ","_"),pe.data->long_name+sdum+ldes,pe.data->units);
 	}
     }
   }
-  format=pe.data->format;
 }
 
 void printDAS()
@@ -1546,7 +1552,14 @@ std::cerr << "but it did happen (2)" << std::endl;
   else {
     query_spec << " metautil.custom_dap_grid_index as g";
   }
-  query_spec << " left join metautil.custom_dap_level_index as l on l.ID = g.ID and l.level_code = g.level_code left join IGrML.`ds" << dap_args.dsnum2 << "_inventory_" << pdata.data->format_code << "!" << pdata.data->code << "` as i on i.valid_date = g.valid_date and i.webID_code = g.webID_code and i.timeRange_code = g.timeRange_code and i.level_code = g.level_code left join WGrML.ds" << dap_args.dsnum2 << "_webfiles as w on w.code = i.webID_code left join WGrML.formats as f on f.code = w.format_code where g.ID = '" << dap_args.ID << "' and g.param = '" << pe.key << "'";
+  query_spec << " left join metautil.custom_dap_level_index as l on l.ID = g.ID and l.level_code = g.level_code left join IGrML.`ds" << dap_args.dsnum2 << "_inventory_";
+  if (pdata.data->format_codes.size() < 2 && pdata.data->codes.size() < 2) {
+    query_spec << pdata.data->format_codes.front() << "!" << pdata.data->codes.front();
+  }
+  else {
+    query_spec << "<FCODE>!<PCODE>";
+  }
+  query_spec << "` as i on i.valid_date = g.valid_date and i.webID_code = g.webID_code and i.timeRange_code = g.timeRange_code and i.level_code = g.level_code left join WGrML.ds" << dap_args.dsnum2 << "_webfiles as w on w.code = i.webID_code left join WGrML.formats as f on f.code = w.format_code where g.ID = '" << dap_args.ID << "' and g.param = '" << pe.key << "'";
   std::string order_by;
   if (pe.data->ref_time_dim.name.length() > 0) {
     if (pe.data->idx[0].start == pe.data->idx[0].stop) {
@@ -1554,10 +1567,13 @@ std::cerr << "but it did happen (2)" << std::endl;
     }
     else {
 	query_spec << " and g.time_slice_index >= " << pe.data->idx[0].start << " and g.time_slice_index <= " << pe.data->idx[0].stop;
-	if (order_by.length() > 0) {
+	if (!order_by.empty()) {
 	  order_by+=",";
 	}
-	order_by+="g.time_slice_index";
+	if (pdata.data->format_codes.size() < 2 && pdata.data->codes.size() < 2) {
+	  order_by+="g.";
+	}
+	order_by+="time_slice_index";
     }
     if (pe.data->idx.size() == 5) {
 	if (pe.data->idx[2].start == pe.data->idx[2].stop) {
@@ -1565,10 +1581,13 @@ std::cerr << "but it did happen (2)" << std::endl;
 	}
 	else {
 	  query_spec << " and l.slice_index >= " << pe.data->idx[2].start << " and l.slice_index <= " << pe.data->idx[2].stop;
-	  if (order_by.length() > 0) {
+	  if (!order_by.empty()) {
 	    order_by+=",";
 	  }
-	  order_by+="l.slice_index";
+	  if (pdata.data->format_codes.size() < 2 && pdata.data->codes.size() < 2) {
+	    order_by+="l.";
+	  }
+	  order_by+="slice_index";
 	}
     }
   }
@@ -1578,10 +1597,13 @@ std::cerr << "but it did happen (2)" << std::endl;
     }
     else {
 	query_spec << " and g.time_slice_index >= " << pe.data->idx[0].start << " and g.time_slice_index <= " << pe.data->idx[0].stop;
-	if (order_by.length() > 0) {
+	if (!order_by.empty()) {
 	  order_by+=",";
 	}
-	order_by+="g.time_slice_index";
+	if (pdata.data->format_codes.size() < 2 && pdata.data->codes.size() < 2) {
+	  order_by+="g.";
+	}
+	order_by+="time_slice_index";
     }
     if (pe.data->idx.size() == 4) {
 	if (pe.data->idx[1].start == pe.data->idx[1].stop) {
@@ -1592,20 +1614,45 @@ std::cerr << "but it did happen (2)" << std::endl;
 	  if (pe.data->idx[1].increment > 1) {
 	    query_spec << " and (l.slice_index % " << pe.data->idx[1].increment << ") = 0";
 	  }
-	  if (order_by.length() > 0) {
+	  if (!order_by.empty()) {
 	    order_by+=",";
 	  }
-	  order_by+="l.slice_index";
+	  if (pdata.data->format_codes.size() < 2 && pdata.data->codes.size() < 2) {
+	    order_by+="l.";
+	  }
+	  order_by+="slice_index";
 	}
     }
   }
   query_spec << " and i.gridDefinition_code = " << dap_args.grid_definition.code;
-  if (order_by.length() > 0) {
-    query_spec << " order by " << order_by;
+  MySQL::LocalQuery query;
+  if (pdata.data->format_codes.size() > 1 || pdata.data->codes.size() > 1) {
+    std::string union_spec;
+    for (const auto& format_code : pdata.data->format_codes) {
+	for (const auto& code : pdata.data->codes) {
+	  if (MySQL::table_exists(server,"IGrML.ds"+dap_args.dsnum2+"_inventory_"+format_code+"!"+code)) {
+	    if (!union_spec.empty()) {
+		union_spec+=" UNION ";
+	    }
+	    union_spec+=strutils::substitute(strutils::substitute(query_spec.str(),"<FCODE>",format_code),"<PCODE>",code);
+	  }
+	}
+    }
+    if (!order_by.empty()) {
+	union_spec+=" order by "+order_by;
+    }
+    query.set(union_spec);
   }
-  MySQL::LocalQuery query(query_spec.str());
+  else {
+    if (!order_by.empty()) {
+	query_spec << " order by " << order_by;
+    }
+    query.set(query_spec.str());
+  }
   if (query.submit(server) == 0) {
     decodeGridDefinition();
+    std::unique_ptr<GRIBMessage> msg(nullptr);
+    std::unique_ptr<GRIB2Message> msg2(nullptr);
     char *filebuf=nullptr;
     int filebuf_len=0;
     std::ifstream ifs;
@@ -1635,28 +1682,34 @@ std::cerr << "but it did happen (2)" << std::endl;
 	      filebuf=new char[filebuf_len];
 	    }
 	    ifs.read(filebuf,num_bytes);
-	    GRIBMessage msg;
-	    GRIB2Message msg2;
 	    Grid *grid=nullptr;
 	    if (row[0] == "WMO_GRIB1") {
-		msg.fill(reinterpret_cast<unsigned char *>(filebuf),false);
-		grid=msg.getGrid(0);
+		if (msg == nullptr) {
+		  msg.reset(new GRIBMessage);
+		}
+		msg->fill(reinterpret_cast<unsigned char *>(filebuf),false);
+		grid=msg->getGrid(0);
 	    }
 	    else {
-		msg2.quickFill(reinterpret_cast<unsigned char *>(filebuf));
-		if (msg2.getNumberOfGrids() > 1) {
-		  for (size_t n=0; n < msg2.getNumberOfGrids(); ++n) {
+		if (msg2 == nullptr) {
+		  msg2.reset(new GRIB2Message);
+		}
+		msg2->quickFill(reinterpret_cast<unsigned char *>(filebuf));
+		if (msg2->getNumberOfGrids() > 1) {
+		  for (size_t n=0; n < msg2->getNumberOfGrids(); ++n) {
 		    std::stringstream ss;
-		    auto g=msg2.getGrid(n);
+		    auto g=msg2->getGrid(n);
 		    ss << reinterpret_cast<GRIB2Grid *>(g)->getDiscipline() << "." << reinterpret_cast<GRIB2Grid *>(g)->getParameterCategory() << "." << g->getParameter();
-		    if (std::regex_search(pdata.data->code,std::regex(ss.str()+"$"))) {
-			grid=g;
-			break;
+		    for (const auto& code : pdata.data->codes) {
+			if (std::regex_search(code,std::regex(":"+ss.str()+"$"))) {
+			  grid=g;
+			  n=msg2->getNumberOfGrids();
+			}
 		    }
 		  }
 		}
 		else {
-		  grid=msg2.getGrid(0);
+		  grid=msg2->getGrid(0);
 		}
 	    }
 	    if (grid != nullptr) {
