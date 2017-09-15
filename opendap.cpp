@@ -248,19 +248,38 @@ void writeTimes(std::ostream& outs,const ProjectionEntry& pe,int time_index)
   }
   MySQL::LocalQuery query(query_spec);
   if (query.submit(server) == 0) {
-    char buf[4];
-    if (time_index < 0) {
-	setBits(buf,query.num_rows(),0,32);
+    if (dap_args.ext == ".ascii") {
+	outs << "^" << pe.data->time_dim.name << std::endl;
     }
     else {
-	setBits(buf,pe.data->idx[time_index].length,0,32);
-    }
-    outs.write(buf,4);
-    outs.write(buf,4);
-    MySQL::Row row;
-    while (query.fetch_row(row)) {
-	setBits(buf,DateTime(std::stoll(row[0])*100).getMinutesSince(base_dt),0,32);
+	char buf[4];
+	if (time_index < 0) {
+	  setBits(buf,query.num_rows(),0,32);
+	}
+	else {
+	  setBits(buf,pe.data->idx[time_index].length,0,32);
+	}
 	outs.write(buf,4);
+	outs.write(buf,4);
+    }
+    MySQL::Row row;
+    auto cnt=0;
+    while (query.fetch_row(row)) {
+	if (dap_args.ext == ".ascii") {
+	  if (cnt > 0) {
+	    outs << ", ";
+	  }
+	  outs << DateTime(std::stoll(row[0])*100).getMinutesSince(base_dt);
+	}
+	else {
+	  char buf[4];
+	  setBits(buf,DateTime(std::stoll(row[0])*100).getMinutesSince(base_dt),0,32);
+	  outs.write(buf,4);
+	}
+	++cnt;
+    }
+    if (dap_args.ext == ".ascii") {
+	outs << std::endl;
     }
   }
 }
@@ -310,11 +329,17 @@ void writeLevels(std::ostream& outs,const ProjectionEntry& pe,int lev_index)
   query_spec+=" order by i.slice_index";
   MySQL::LocalQuery query(query_spec);
   if (query.submit(server) == 0) {
-    char buf[4];
-    setBits(buf,query.num_rows(),0,32);
-    outs.write(buf,4);
-    outs.write(buf,4);
+    if (dap_args.ext == ".ascii") {
+	outs << "^" << pe.data->level_dim.name << std::endl;
+    }
+    else {
+	char buf[4];
+	setBits(buf,query.num_rows(),0,32);
+	outs.write(buf,4);
+	outs.write(buf,4);
+    }
     MySQL::Row row;
+    auto cnt=0;
     while (query.fetch_row(row)) {
 	Value value;
 	if (strutils::contains(row[0],",")) {
@@ -324,8 +349,21 @@ void writeLevels(std::ostream& outs,const ProjectionEntry& pe,int lev_index)
 	else {
 	  value.f=std::stof(row[0]);
 	}
-	setBits(buf,value.i,0,32);
-	outs.write(buf,4);
+	if (dap_args.ext == ".ascii") {
+	  if (cnt > 0) {
+	    outs << ", ";
+	  }
+	  outs << value.f;
+	}
+	else {
+	  char buf[4];
+	  setBits(buf,value.i,0,32);
+	  outs.write(buf,4);
+	}
+	++cnt;
+    }
+    if (dap_args.ext == ".ascii") {
+	outs << std::endl;
     }
   }
 }
@@ -466,24 +504,41 @@ void writeLatitudes(std::ostream& outs,const ProjectionEntry& pe,int lat_index)
   char buf[4];
   int start,stop;
   if (lat_index < 0) {
-    setBits(buf,lat.length,0,32);
+    if (dap_args.ext != ".ascii") {
+	setBits(buf,lat.length,0,32);
+    }
     start=dap_args.grid_definition.lat_index.start;
     stop=dap_args.grid_definition.lat_index.end;
   }
   else {
-    setBits(buf,pe.data->idx[lat_index].length,0,32);
+    if (dap_args.ext != ".ascii") {
+	setBits(buf,pe.data->idx[lat_index].length,0,32);
+    }
     start=dap_args.grid_definition.lat_index.start+pe.data->idx[lat_index].start;
     stop=dap_args.grid_definition.lat_index.start+pe.data->idx[lat_index].stop;
   }
-  outs.write(buf,4);
-  outs.write(buf,4);
+  if (dap_args.ext == ".ascii") {
+    outs << "^lat" << std::endl;
+  }
+  else {
+    outs.write(buf,4);
+    outs.write(buf,4);
+  }
   Value value;
   if (dap_args.grid_definition.type == "latLon") {
     for (int n=dap_args.grid_definition.lat_index.start; n <= dap_args.grid_definition.lat_index.end; n++) {
 	if (lat_index < 0 || (n >= start && n <= stop)) {
 	  value.f=lat.start+n*lat.increment;
-	  setBits(buf,value.i,0,32);
-	  outs.write(buf,4);
+	  if (dap_args.ext == ".ascii") {
+	    if (n > dap_args.grid_definition.lat_index.start) {
+		outs << ", ";
+	    }
+	    outs << value.f;
+	  }
+	  else {
+	    setBits(buf,value.i,0,32);
+	    outs.write(buf,4);
+	  }
 	}
     }
   }
@@ -497,10 +552,21 @@ void writeLatitudes(std::ostream& outs,const ProjectionEntry& pe,int lat_index)
     for (int n=dap_args.grid_definition.lat_index.start; n <= dap_args.grid_definition.lat_index.end; n++) {
 	if (lat_index < 0 || (n >= start && n <= stop)) {
 	  value.f=gle.lats[n];
-	  setBits(buf,value.i,0,32);
-	  outs.write(buf,4);
+	  if (dap_args.ext == ".ascii") {
+	    if (n > dap_args.grid_definition.lat_index.start) {
+		outs << ", ";
+	    }
+	    outs << value.f;
+	  }
+	  else {
+	    setBits(buf,value.i,0,32);
+	    outs.write(buf,4);
+	  }
 	}
     }
+  }
+  if (dap_args.ext == ".ascii") {
+    outs << std::endl;
   }
 }
 
@@ -510,17 +576,26 @@ void writeLongitudes(std::ostream& outs,const ProjectionEntry& pe,int lon_index)
   char buf[4];
   int start,stop;
   if (lon_index < 0) {
-    setBits(buf,lon.length,0,32);
+    if (dap_args.ext != ".ascii") {
+	setBits(buf,lon.length,0,32);
+    }
     start=dap_args.grid_definition.lon_index.start;
     stop=dap_args.grid_definition.lon_index.end;
   }
   else {
-    setBits(buf,pe.data->idx[lon_index].length,0,32);
+    if (dap_args.ext != ".ascii") {
+	setBits(buf,pe.data->idx[lon_index].length,0,32);
+    }
     start=dap_args.grid_definition.lon_index.start+pe.data->idx[lon_index].start;
     stop=dap_args.grid_definition.lon_index.start+pe.data->idx[lon_index].stop;
   }
-  outs.write(buf,4);
-  outs.write(buf,4);
+  if (dap_args.ext == ".ascii") {
+    outs << "^lon" << std::endl;
+  }
+  else {
+    outs.write(buf,4);
+    outs.write(buf,4);
+  }
   for (int n=dap_args.grid_definition.lon_index.start; n <= dap_args.grid_definition.lon_index.end; ++n) {
     if (lon_index < 0 || (n >= start && n <= stop)) {
 	Value value;
@@ -528,9 +603,20 @@ void writeLongitudes(std::ostream& outs,const ProjectionEntry& pe,int lon_index)
 	if (value.f > 360.) {
 	  value.f-=360.;
 	}
-	setBits(buf,value.i,0,32);
-	outs.write(buf,4);
+	if (dap_args.ext == ".ascii") {
+	  if (n > dap_args.grid_definition.lon_index.start) {
+	    outs << ", ";
+	  }
+	  outs << value.f;
+	}
+	else {
+	  setBits(buf,value.i,0,32);
+	  outs.write(buf,4);
+	}
     }
+  }
+  if (dap_args.ext == ".ascii") {
+    outs << std::endl;
   }
 }
 
@@ -1445,9 +1531,6 @@ clock_gettime(CLOCK_REALTIME,&tp);
   else {
     grid_size*=pe.data->idx[lon_idx].length;
   }
-  float *fpoints=new float[grid_size];
-  char *buffer=new char[grid_size*4];
-  char *mbuffer=nullptr;
   long long num_points=grid_size;
   for (size_t n=0; n < lat_idx; ++n) {
     if (pe.data->idx[n].increment > 1) {
@@ -1463,10 +1546,6 @@ clock_gettime(CLOCK_REALTIME,&tp);
   else {
     std::cout << dds.str();
   }
-  char buf[4];
-  setBits(buf,num_points,0,32);
-  std::cout.write(buf,4);
-  std::cout.write(buf,4);
   ParameterData pdata;
   if (!dap_args.parameters.found(pe.key,pdata)) {
     size_t idx;
@@ -1488,6 +1567,15 @@ std::cerr << "but it did happen (1)" << std::endl;
 std::cerr << "but it did happen (2)" << std::endl;
 	exit(0);
     }
+  }
+  if (dap_args.ext == ".dods") {
+    char buf[4];
+    setBits(buf,num_points,0,32);
+    std::cout.write(buf,4);
+    std::cout.write(buf,4);
+  }
+  else {
+    std::cout << "^" << pe.key << "." << pe.key << std::endl;
   }
   std::stringstream query_spec;
   query_spec << "select f.format,w.webID,i.byte_offset,i.byte_length,i.valid_date";
@@ -1650,149 +1738,181 @@ std::cerr << "but it did happen (2)" << std::endl;
     query.set(query_spec.str());
   }
   if (query.submit(server) == 0) {
-    decodeGridDefinition();
-    std::unique_ptr<GRIBMessage> msg(nullptr);
-    std::unique_ptr<GRIB2Message> msg2(nullptr);
-    char *filebuf=nullptr;
-    int filebuf_len=0;
-    std::ifstream ifs;
-    std::string last_file;
-    long long last_offset=0;
-    size_t next_off=0;
-    MySQL::Row row;
-    while (query.fetch_row(row)) {
-	auto offset=std::stoll(row[2]);
-	if (row[0] == "WMO_GRIB1" || row[0] == "WMO_GRIB2") {
-	  if (row[1] != last_file) {
+    if (query.num_rows() > 0) {
+	float *fpoints=new float[grid_size];
+	char *buffer=new char[grid_size*4];
+	char *mbuffer=nullptr;
+	decodeGridDefinition();
+	std::unique_ptr<GRIBMessage> msg(nullptr);
+	std::unique_ptr<GRIB2Message> msg2(nullptr);
+	char *filebuf=nullptr;
+	int filebuf_len=0;
+	std::ifstream ifs;
+	std::string last_file;
+	long long last_offset=0;
+	size_t next_off=0;
+	MySQL::Row row;
+	while (query.fetch_row(row)) {
+	  auto offset=std::stoll(row[2]);
+	  if (row[0] == "WMO_GRIB1" || row[0] == "WMO_GRIB2") {
+	    if (row[1] != last_file) {
+		if (ifs.is_open()) {
+		  ifs.close();
+		  ifs.clear();
+		}
+		ifs.open(("/glade/p/rda/data/ds"+dap_args.dsnum+"/"+row[1]));
+		last_offset=0;
+	    }
 	    if (ifs.is_open()) {
-		ifs.close();
-		ifs.clear();
-	    }
-	    ifs.open(("/glade/p/rda/data/ds"+dap_args.dsnum+"/"+row[1]));
-	    last_offset=0;
-	  }
-	  if (ifs.is_open()) {
-	    ifs.seekg(offset-last_offset,std::ios::cur);
-	    auto num_bytes=std::stoll(row[3]);
-	    if (num_bytes > filebuf_len) {
-		if (filebuf != nullptr) {
-		  delete[] filebuf;
+		ifs.seekg(offset-last_offset,std::ios::cur);
+		auto num_bytes=std::stoll(row[3]);
+		if (num_bytes > filebuf_len) {
+		  if (filebuf != nullptr) {
+		    delete[] filebuf;
+		  }
+		  filebuf_len=num_bytes;
+		  filebuf=new char[filebuf_len];
 		}
-	      filebuf_len=num_bytes;
-	      filebuf=new char[filebuf_len];
-	    }
-	    ifs.read(filebuf,num_bytes);
-	    Grid *grid=nullptr;
-	    if (row[0] == "WMO_GRIB1") {
-		if (msg == nullptr) {
-		  msg.reset(new GRIBMessage);
+		ifs.read(filebuf,num_bytes);
+		Grid *grid=nullptr;
+		if (row[0] == "WMO_GRIB1") {
+		  if (msg == nullptr) {
+		    msg.reset(new GRIBMessage);
+		  }
+		  msg->fill(reinterpret_cast<unsigned char *>(filebuf),false);
+		  grid=msg->getGrid(0);
 		}
-		msg->fill(reinterpret_cast<unsigned char *>(filebuf),false);
-		grid=msg->getGrid(0);
-	    }
-	    else {
-		if (msg2 == nullptr) {
-		  msg2.reset(new GRIB2Message);
-		}
-		msg2->quickFill(reinterpret_cast<unsigned char *>(filebuf));
-		if (msg2->getNumberOfGrids() > 1) {
-		  for (size_t n=0; n < msg2->getNumberOfGrids(); ++n) {
-		    std::stringstream ss;
-		    auto g=msg2->getGrid(n);
-		    ss << reinterpret_cast<GRIB2Grid *>(g)->getDiscipline() << "." << reinterpret_cast<GRIB2Grid *>(g)->getParameterCategory() << "." << g->getParameter();
-		    for (const auto& code : pdata.data->codes) {
-			if (std::regex_search(code,std::regex(":"+ss.str()+"$"))) {
-			  grid=g;
-			  n=msg2->getNumberOfGrids();
+		else {
+		  if (msg2 == nullptr) {
+		    msg2.reset(new GRIB2Message);
+		  }
+		  msg2->quickFill(reinterpret_cast<unsigned char *>(filebuf));
+		  if (msg2->getNumberOfGrids() > 1) {
+		    for (size_t n=0; n < msg2->getNumberOfGrids(); ++n) {
+			std::stringstream ss;
+			auto g=msg2->getGrid(n);
+			ss << reinterpret_cast<GRIB2Grid *>(g)->getDiscipline() << "." << reinterpret_cast<GRIB2Grid *>(g)->getParameterCategory() << "." << g->getParameter();
+			for (const auto& code : pdata.data->codes) {
+			  if (std::regex_search(code,std::regex(":"+ss.str()+"$"))) {
+			    grid=g;
+			    n=msg2->getNumberOfGrids();
+			  }
 			}
 		    }
 		  }
+		  else {
+		    grid=msg2->getGrid(0);
+		  }
 		}
-		else {
-		  grid=msg2->getGrid(0);
+		if (grid != nullptr) {
+		  double **gridpoints=grid->getGridpoints();
+		  int n_end=dap_args.grid_definition.lat_index.start+pe.data->idx[lat_idx].start+pe.data->idx[lat_idx].length;
+		  int m_end=dap_args.grid_definition.lon_index.start+pe.data->idx[lon_idx].start+pe.data->idx[lon_idx].length;
+		  size_t foff;
+		  if (pe.data->ref_time_dim.name.length() > 0) {
+		    auto mult=0;
+		    size_t roff=6;
+		    if (pe.data->idx[0].start != pe.data->idx[0].stop) {
+			mult=(std::stoi(row[roff++])-pe.data->idx[0].start)/pe.data->idx[0].increment;
+		    }
+		    if (pe.data->idx[1].start != pe.data->idx[1].stop) {
+			if (pe.data->idx[1].increment > 1) {
+			  mult*=(pe.data->idx[1].length+pe.data->idx[1].increment-1)/pe.data->idx[1].increment;
+			}
+			else {
+			  mult*=pe.data->idx[1].length;
+			}
+			mult+=(std::stoi(row[roff++])-pe.data->idx[1].start)/pe.data->idx[1].increment;
+		    }
+		    if (pe.data->idx.size() == 5 && pe.data->idx[2].start != pe.data->idx[2].stop) {
+			if (pe.data->idx[2].increment > 1) {
+			  mult*=(pe.data->idx[2].length+pe.data->idx[2].increment-1)/pe.data->idx[2].increment;
+			}
+			else {
+			  mult*=pe.data->idx[2].length;
+			}
+			mult+=(std::stoi(row[roff++])-pe.data->idx[2].start)/pe.data->idx[2].increment;
+		    }
+		    foff=mult*grid_size;
+		  }
+		  else {
+		    auto mult=0;
+		    size_t roff=5;
+		    if (pe.data->idx[0].start != pe.data->idx[0].stop) {
+			mult=(std::stoi(row[roff++])-pe.data->idx[0].start)/pe.data->idx[0].increment;
+		    }
+		    if (pe.data->idx.size() == 4 && pe.data->idx[1].start != pe.data->idx[1].stop) {
+			if (pe.data->idx[1].increment > 1) {
+			  mult*=(pe.data->idx[1].length+pe.data->idx[1].increment-1)/pe.data->idx[1].increment;
+			}
+			else {
+			  mult*=pe.data->idx[1].length;
+			}
+			mult+=(std::stoi(row[roff++])-pe.data->idx[1].start)/pe.data->idx[1].increment;
+		    }
+		    foff=mult*grid_size;
+		  }
+		  if (foff != next_off) {
+		    if (mbuffer == nullptr) {
+			mbuffer=new char[grid_size*4];
+			for (size_t n=0; n < grid_size; ++n) {
+			  fpoints[n]=Grid::missingValue;
+			}
+			setBits(mbuffer,reinterpret_cast<int *>(fpoints),0,32,0,grid_size);
+		    }
+		    while (next_off < foff) {
+			std::cout.write(mbuffer,grid_size*4);
+			next_off+=grid_size;
+		    }
+		  }
+		  short dimx=grid->getDimensions().x;
+		  auto idx=0;
+		  for (int n=dap_args.grid_definition.lat_index.start+pe.data->idx[lat_idx].start; n < n_end; n+=pe.data->idx[lat_idx].increment) {
+		    for (int m=dap_args.grid_definition.lon_index.start+pe.data->idx[lon_idx].start; m < m_end; m+=pe.data->idx[lon_idx].increment) {
+			if (dap_args.ext == ".ascii" && idx > 0) {
+			  std::cout << ", ";
+			}
+			if (m >= dimx) {
+			  if (dap_args.ext == ".dods") {
+			    fpoints[idx]=gridpoints[n][m-dimx];
+			  }
+			  else {
+			    std::cout << gridpoints[n][m-dimx];
+			  }
+			}
+			else {
+			  if (dap_args.ext == ".dods") {
+			    fpoints[idx]=gridpoints[n][m];
+			  }
+			  else {
+			    std::cout << gridpoints[n][m];
+			  }
+			}
+			++idx;
+		    }
+		    if (dap_args.ext == ".ascii") {
+			std::cout << std::endl;
+		    }
+		  }
+		  if (dap_args.ext == ".dods") {
+		    setBits(buffer,reinterpret_cast<int *>(fpoints),0,32,0,grid_size);
+		    std::cout.write(buffer,grid_size*4);
+		  }
+		  next_off=foff+grid_size;
 		}
+		last_offset=offset+num_bytes;
 	    }
-	    if (grid != nullptr) {
-		double **gridpoints=grid->getGridpoints();
-		int n_end=dap_args.grid_definition.lat_index.start+pe.data->idx[lat_idx].start+pe.data->idx[lat_idx].length;
-		int m_end=dap_args.grid_definition.lon_index.start+pe.data->idx[lon_idx].start+pe.data->idx[lon_idx].length;
-		size_t foff;
-		if (pe.data->ref_time_dim.name.length() > 0) {
-		  auto mult=0;
-		  size_t roff=6;
-		  if (pe.data->idx[0].start != pe.data->idx[0].stop) {
-		    mult=(std::stoi(row[roff++])-pe.data->idx[0].start)/pe.data->idx[0].increment;
-		  }
-		  if (pe.data->idx[1].start != pe.data->idx[1].stop) {
-		    if (pe.data->idx[1].increment > 1) {
-			mult*=(pe.data->idx[1].length+pe.data->idx[1].increment-1)/pe.data->idx[1].increment;
-		    }
-		    else {
-			mult*=pe.data->idx[1].length;
-		    }
-		    mult+=(std::stoi(row[roff++])-pe.data->idx[1].start)/pe.data->idx[1].increment;
-		  }
-		  if (pe.data->idx.size() == 5 && pe.data->idx[2].start != pe.data->idx[2].stop) {
-		    if (pe.data->idx[2].increment > 1) {
-			mult*=(pe.data->idx[2].length+pe.data->idx[2].increment-1)/pe.data->idx[2].increment;
-		    }
-		    else {
-			mult*=pe.data->idx[2].length;
-		    }
-		    mult+=(std::stoi(row[roff++])-pe.data->idx[2].start)/pe.data->idx[2].increment;
-		  }
-		  foff=mult*grid_size;
-		}
-		else {
-		  auto mult=0;
-		  size_t roff=5;
-		  if (pe.data->idx[0].start != pe.data->idx[0].stop) {
-		    mult=(std::stoi(row[roff++])-pe.data->idx[0].start)/pe.data->idx[0].increment;
-		  }
-		  if (pe.data->idx.size() == 4 && pe.data->idx[1].start != pe.data->idx[1].stop) {
-		    if (pe.data->idx[1].increment > 1) {
-			mult*=(pe.data->idx[1].length+pe.data->idx[1].increment-1)/pe.data->idx[1].increment;
-		    }
-		    else {
-			mult*=pe.data->idx[1].length;
-		    }
-		    mult+=(std::stoi(row[roff++])-pe.data->idx[1].start)/pe.data->idx[1].increment;
-		  }
-		  foff=mult*grid_size;
-		}
-		if (foff != next_off) {
-		  if (mbuffer == nullptr) {
-		    mbuffer=new char[grid_size*4];
-		    for (size_t n=0; n < grid_size; ++n) {
-			fpoints[n]=Grid::missingValue;
-		    }
-		    setBits(mbuffer,reinterpret_cast<int *>(fpoints),0,32,0,grid_size);
-		  }
-		  while (next_off < foff) {
-		    std::cout.write(mbuffer,grid_size*4);
-		    next_off+=grid_size;
-		  }
-		}
-		short dimx=grid->getDimensions().x;
-		auto idx=0;
-		for (int n=dap_args.grid_definition.lat_index.start+pe.data->idx[lat_idx].start; n < n_end; n+=pe.data->idx[lat_idx].increment) {
-		  for (int m=dap_args.grid_definition.lon_index.start+pe.data->idx[lon_idx].start; m < m_end; m+=pe.data->idx[lon_idx].increment) {
-		    if (m >= dimx) {
-			fpoints[idx++]=gridpoints[n][m-dimx];
-		    }
-		    else {
-			fpoints[idx++]=gridpoints[n][m];
-		    }
-		  }
-		}
-		setBits(buffer,reinterpret_cast<int *>(fpoints),0,32,0,grid_size);
-		std::cout.write(buffer,grid_size*4);
-		next_off=foff+grid_size;
-	    }
-	    last_offset=offset+num_bytes;
 	  }
+	  last_file=row[1];
 	}
-	last_file=row[1];
+    }
+    else {
+	auto mbuffer=new char[4];
+	float f[]={static_cast<float>(Grid::missingValue)};
+	setBits(mbuffer,reinterpret_cast<int *>(f),0,32,0,1);
+	for (size_t n=0; n < grid_size; ++n) {
+	  std::cout.write(mbuffer,4);
+	}
     }
   }
   if (pe.data->member.length() == 0) {
@@ -1826,6 +1946,7 @@ void outputDODS()
   dds << std::endl;
   dds << "Data:" << std::endl;
   if (projection_table.size() == 0) {
+    dapError("400 Bad Request","Bad request (dods)");
   }
   else {
     for (const auto& key : projection_table.keys()) {
@@ -2033,7 +2154,7 @@ std::cerr << tp.tv_sec << " " << tp.tv_nsec << std::endl;
 	printDAS();
     }
   }
-  else if (dap_args.ext == ".dods") {
+  else if (dap_args.ext == ".dods" || dap_args.ext == ".ascii") {
     outputDODS();
   }
   else if (dap_args.ext == ".ver") {
