@@ -773,7 +773,7 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
 	  }
 	  if (has_levels) {
 	    MySQL::LocalQuery query2;
-	    query2.set("select l.dim_name,l.dim_size from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+row[0]+"') as x) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
+	    query2.set("select l.dim_name,l.dim_size from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID and l.level_code = g.level_code where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+row[0]+"') as x group by x.uID) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
 	    if (query2.submit(server) < 0) {
 		std::cerr << "opendap printDDS(4a): " << query2.error() << " for " << query2.show() << std::endl;
 		dapError("500 Internal Server Error","Database error printDDS(4a)");
@@ -890,7 +890,7 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
 		  }
 		}
 		if (hasLevels(server,query)) {
-		  query.set("select l.dim_name,l.dim_size from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+key+"') as x) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
+		  query.set("select l.dim_name,l.dim_size from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID and l.level_code = g.level_code where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+key+"') as x group by x.uID) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
 		  if (query.submit(server) == 0 && query.fetch_row(row)) {
 		    di.length=std::stoi(row[1]);
 		    di.start=0;
@@ -1410,7 +1410,7 @@ void printParameters(std::string& format,xmlutils::LevelMapper& level_mapper)
   while (query.fetch_row(row)) {
     parameter_table.found(row[0].substr(0,row[0].rfind("_")),pe);
     MySQL::LocalQuery query2;
-    query2.set("select l.level_key,y.level_codes from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size,group_concat(x.level_code separator '!') as level_codes from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+row[0]+"') as x) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
+    query2.set("select l.level_key,y.level_codes from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size,group_concat(x.level_code separator '!') as level_codes from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID and l.level_code = g.level_code where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+row[0]+"') as x group by x.uID) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
     if (query2.submit(server) < 0) {
 	std::cerr << "opendap printDAS(1a): " << query2.error() << " for " << query2.show() << std::endl;
 	dapError("500 Internal Server Error","Database error printDAS(1a)");
