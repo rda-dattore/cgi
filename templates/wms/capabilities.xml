@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<WMS_Capabilities xmlns="http://www.opengis.net/wms" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengis.net/wms http://schemas.opengis.net/wms/1.3.0/capabilities_1_3_0.xsd" version="1.3.0" updateSequence="__UPDATE_SEQUENCE__">
+  <Service>
+    <Name>WMS</Name>
+    <Title>NCAR Research Data Archive Web Map Service</Title>
+#IF __HAS_ABSTRACT__
+    <Abstract>__ABSTRACT__</Abstract>
+#ENDIF __HAS_ABSTRACT__
+#IF __HAS_KEYWORDS__
+    <KeywordList>
+#REPEAT __KEYWORD__
+      <Keyword>__KEYWORD__<Keyword>
+#ENDREPEAT __KEYWORD__
+    </KeywordList>
+#ENDIF __HAS_KEYWORDS__
+    <OnlineResource xlink:type="simple" xlink:href="https://rda.ucar.edu/" />
+    <ContactInformation>
+       <ContactPersonPrimary>
+         <ContactPerson>RDA Help</ContactPerson>
+         <ContactOrganization>NCAR Research Data Archive</ContactOrganization>
+       </ContactPersonPrimary>
+       <ContactElectronicMailAddress>rdahelp@ucar.edu</ContactElectronicMailAddress>
+    </ContactInformation>
+    <Fees>none</Fees>
+    <AccessConstraints>none</AccessConstraints>
+    <LayerLimit>1</LayerLimit>
+#IF __HAS_MAX_WIDTH_AND_HEIGHT__
+    <MaxWidth>__MAX_WIDTH__</MaxWidth>
+    <MaxHeight>__MAX_HEIGHT__</MaxHeight>
+#ENDIF __HAS_MAX_WIDTH_AND_HEIGHT__
+  </Service>
+  <Capability>
+    <Request>
+      <GetCapabilities>
+        <Format>text/xml</Format>
+        <DCPType>
+          <HTTP>
+            <Get>
+              <OnlineResource xlink:type="simple" xlink:href="__SERVICE_RESOURCE_GET_URL__" />
+            </Get>
+#IF __POST_REQUESTS_ENABLED__
+            <Post>
+              <OnlineResource xlink:type="simple" xlink:href="__SERVICE_RESOURCE_POST_URL__" />
+            </Post>
+#ENDIF __POST_REQUESTS_ENABLED__
+          </HTTP>
+        </DCPType>
+      </GetCapabilities>
+      <GetMap>
+#REPEAT __IMAGE_FORMAT__
+        <Format>__IMAGE_FORMAT__</Format>
+#ENDREPEAT __IMAGE_FORMAT__
+        <DCPType>
+          <HTTP>
+            <Get>
+              <OnlineResource xlink:type="simple" xlink:href="__SERVICE_RESOURCE_GET_URL__" />
+            </Get>
+#IF __POST_REQUESTS_ENABLED__
+            <Post>
+              <OnlineResource xlink:type="simple" xlink:href="__SERVICE_RESOURCE_POST_URL__" />
+            </Post>
+#ENDIF __POST_REQUESTS_ENABLED__
+          </HTTP>
+        </DCPType>
+      </GetMap>
+#IF __FEATURE_INFO_ENABLED__
+      <GetFeatureInfo>
+        <Format></Format>
+        <DCPType>
+          <HTTP>
+            <Get>
+              <OnlineResource xlink:type="simple" xlink:href="__FEATURE_INFO_GET_URL__" />
+            </Get>
+#IF __FEATURE_INFO_POST_ENABLED__
+            <Post>
+              <OnlineResource xlink:type="simple" xlink:href="__FEATURE_INFO_POST_URL__" />
+            </Post>
+#ENDIF __FEATURE_INFO_POST_ENABLED__
+          </HTTP>
+        </DCPType>
+      </GetFeatureInfo>
+#ENDIF __FEATURE_INFO_ENABLED__
+    </Request>
+    <Exception>
+      <Format>text/xml</Format>
+    </Exception>
+__LAYERS__
+  </Capability>
+</WMS_Capabilities>
