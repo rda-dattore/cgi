@@ -7,27 +7,30 @@
 #include <xml.hpp>
 #include <metadata.hpp>
 #include <strutils.hpp>
+#include <myerror.hpp>
 
 metautils::Directives directives;
 metautils::Args args;
+std::string myerror="";
+std::string mywarning="";
 
-QueryString queryString;
+QueryString query_string;
 std::string verb;
 std::list<std::string> oai_args,bad_args;
 const size_t NUM_FORMATS=8;
 const std::string metadata_formats[NUM_FORMATS]={"oai_dc","datacite","dif","fgdc","iso19139","iso19115-3","native","thredds"};
-const std::string repositoryIdentifier("edu.ucar.rda");
+const std::string REPOSITORY_IDENTIFIER="edu.ucar.rda";
 
-void parseQuery()
+void parse_query()
 {
-  QueryString queryString_get(QueryString::GET);
-  QueryString queryString_post(QueryString::POST);
+  QueryString query_string_get(QueryString::GET);
+  QueryString query_string_post(QueryString::POST);
 
-  if (queryString_get) {
-    queryString=queryString_get;
+  if (query_string_get) {
+    query_string=query_string_get;
   }
-  else if (queryString_post) {
-    queryString=queryString_post;
+  else if (query_string_post) {
+    query_string=query_string_post;
   }
   else {
     std::cout << "  <request>https://rda.ucar.edu/cgi-bin/oai</request>" << std::endl;
@@ -35,16 +38,16 @@ void parseQuery()
     std::cout << "</OAI-PMH>" << std::endl;
     exit(1);
   }
-  verb=queryString.getValue("verb");
-  oai_args=queryString.getRawNames();
+  verb=query_string.value("verb");
+  oai_args=query_string.raw_names();
 }
 
-void checkFormats(std::string metadataPrefix)
+void check_formats(std::string metadata_prefix)
 {
   size_t n;
 
   for (n=0; n < NUM_FORMATS; ++n) {
-    if (metadataPrefix == metadata_formats[n]) {
+    if (metadata_prefix == metadata_formats[n]) {
 	break;
     }
   }
@@ -55,7 +58,7 @@ void checkFormats(std::string metadataPrefix)
   }
 }
 
-void printBadArgumentsList()
+void print_bad_arguments_list()
 {
   std::cout << "  <request>https://rda.ucar.edu/cgi-bin/oai</request>" << std::endl;
   for (auto& a : bad_args) {
@@ -63,27 +66,26 @@ void printBadArgumentsList()
   }
 }
 
-void printRequestElement()
+void print_request_element()
 {
   std::cout << "  <request";
   for (auto& a : oai_args) {
-    std::cout << " " << a << "=\"" << queryString.getValue(a) << "\"";
+    std::cout << " " << a << "=\"" << query_string.value(a) << "\"";
   }
   std::cout << ">https://rda.ucar.edu/cgi-bin/oai</request>" << std::endl;
 }
 
-void Identify()
+void identify()
 {
-  bool foundError=false;
-
+  auto found_error=false;
   std::cout << "  <request verb=\"Identify\">https://rda.ucar.edu/cgi-bin/oai</request>" << std::endl;
-  for (auto& a : oai_args) {
+  for (const auto& a : oai_args) {
     if (a != "verb") {
 	std::cout << "  <error code=\"badArgument\">'" << a << "' is not allowed here</error>" << std::endl;
-	foundError=true;
+	found_error=true;
     }
   }
-  if (foundError) {
+  if (found_error) {
     return;
   }
   std::cout << "  <Identify>" << std::endl;
@@ -100,37 +102,37 @@ void Identify()
   std::cout << "                      xsi:schemaLocation=\"http://www.openarchives.org/OAI/2.0/oai-identifier" << std::endl;
   std::cout << "                                          http://www.openarchives.org/OAI/2.0/oai-identifier.xsd\">" << std::endl;
   std::cout << "        <scheme>oai</scheme>" << std::endl;
-  std::cout << "        <repositoryIdentifier>" << repositoryIdentifier << "</repositoryIdentifier>" << std::endl;
+  std::cout << "        <repositoryIdentifier>" << REPOSITORY_IDENTIFIER << "</repositoryIdentifier>" << std::endl;
   std::cout << "        <delimiter>:</delimiter>" << std::endl;
-  std::cout << "        <sampleIdentifier>oai:" << repositoryIdentifier << ":ds010.0</sampleIdentifier>" << std::endl;
+  std::cout << "        <sampleIdentifier>oai:" << REPOSITORY_IDENTIFIER << ":ds010.0</sampleIdentifier>" << std::endl;
   std::cout << "      </oai-identifier>" << std::endl;
   std::cout << "    </description>" << std::endl;
   std::cout << "  </Identify>" << std::endl;
 }
 
-void ListMetadataFormats()
+void list_metadata_formats()
 {
   MySQL::Server server;
   MySQL::LocalQuery query;
   MySQL::Row row;
   std::string dsid;
 
-  metautils::connectToMetadataServer(server);
+  metautils::connect_to_metadata_server(server);
   for (auto& a : oai_args) {
     if (a == "identifier") {
-	dsid=queryString.getValue("identifier");
+	dsid=query_string.value("identifier");
     }
     else if (a != "verb") {
 	bad_args.emplace_back(a);
     }
   }
   if (bad_args.size() > 0) {
-    printBadArgumentsList();
+    print_bad_arguments_list();
     return;
   }
-  printRequestElement();
-  if (dsid.length() > 0) {
-    strutils::replace_all(dsid,"oai:"+repositoryIdentifier+":ds","");
+  print_request_element();
+  if (!dsid.empty()) {
+    strutils::replace_all(dsid,"oai:"+REPOSITORY_IDENTIFIER+":ds","");
     query.set("type","search.datasets","dsid = '"+dsid+"'");
     if (query.submit(server) < 0) {
 	std::cout << "Content-type: text/plain" << std::endl << std::endl;
@@ -191,7 +193,7 @@ void ListMetadataFormats()
   std::cout << "  </ListMetadataFormats>" << std::endl;
 }
 
-void ListSets()
+void list_sets()
 {
   for (auto& a : oai_args) {
     if (a != "verb") {
@@ -199,101 +201,101 @@ void ListSets()
     }
   }
   if (bad_args.size() > 0) {
-    printBadArgumentsList();
+    print_bad_arguments_list();
     return;
   }
-  printRequestElement();
+  print_request_element();
   std::cout << "  <error code=\"noSetHierarchy\">Sets not supported</error>" << std::endl;
 }
 
-void buildList(MySQL::LocalQuery& query,std::string& metadataPrefix,bool& foundErrors)
+void build_list(MySQL::LocalQuery& query,std::string& metadata_prefix,bool& found_errors)
 {
   std::string wc;
-  std::string from,until,set,resumptionToken;
+  std::string from,until,set,resumption_token;
   MySQL::Server server;
-  bool otherArg=false;
+  bool other_arg=false;
 
-  metautils::connectToMetadataServer(server);
-  foundErrors=false;
+  metautils::connect_to_metadata_server(server);
+  found_errors=false;
   for (auto& a : oai_args) {
     if (a == "from") {
-	from=queryString.getValue("from");
-	otherArg=true;
+	from=query_string.value("from");
+	other_arg=true;
     }
     else if (a == "until") {
-	until=queryString.getValue("until");
-	otherArg=true;
+	until=query_string.value("until");
+	other_arg=true;
     }
     else if (a == "metadataPrefix") {
-	metadataPrefix=strutils::to_lower(queryString.getValue("metadataPrefix"));
-	otherArg=true;
+	metadata_prefix=strutils::to_lower(query_string.value("metadataPrefix"));
+	other_arg=true;
     }
     else if (a == "set") {
-	set=queryString.getValue("set");
-	otherArg=true;
+	set=query_string.value("set");
+	other_arg=true;
     }
     else if (a == "resumptionToken") {
-	resumptionToken=queryString.getValue("resumptionToken");
+	resumption_token=query_string.value("resumptionToken");
     }
     else if (a != "verb") {
 	bad_args.emplace_back(a);
     }
   }
 // resumptionToken is an exclusive argument
-  if (resumptionToken.length() > 0 && otherArg) {
+  if (!resumption_token.empty() && other_arg) {
     bad_args.emplace_back("resumptionToken");
   }
   if (bad_args.size() > 0) {
-    printBadArgumentsList();
-    foundErrors=true;
+    print_bad_arguments_list();
+    found_errors=true;
     return;
   }
-  if (from.length() > 0 && from.length() != 10 && from.length() != 20) {
+  if (!from.empty() && from.length() != 10 && from.length() != 20) {
     std::cout << "  <request>https://rda.ucar.edu/cgi-bin/oai</request>" << std::endl;
     std::cout << "  <error code=\"badArgument\">'from' is not a UTCdatetime value</error>" << std::endl;
-    foundErrors=true;
+    found_errors=true;
     return;
   }
-  if (until.length() > 0 && until.length() != 10 && until.length() != 20) {
+  if (!until.empty() && until.length() != 10 && until.length() != 20) {
     std::cout << "  <request>https://rda.ucar.edu/cgi-bin/oai</request>" << std::endl;
     std::cout << "  <error code=\"badArgument\">'until' is not a UTCdatetime value</error>" << std::endl;
-    foundErrors=true;
+    found_errors=true;
     return;
   }
-  if (from.length() > 0 && until.length() > 0) {
+  if (!from.empty() && !until.empty()) {
     if (from.length() != until.length()) {
 	std::cout << "  <request>https://rda.ucar.edu/cgi-bin/oai</request>" << std::endl;
 	std::cout << "  <error code=\"badArgument\">'from' and 'until' are of different granularities</error>" << std::endl;
-	foundErrors=true;
+	found_errors=true;
 	return;
     }
     else if (until < from) {
 	std::cout << "  <request>https://rda.ucar.edu/cgi-bin/oai</request>" << std::endl;
 	std::cout << "  <error code=\"badArgument\">'until' must not precede 'from'</error>" << std::endl;
-	foundErrors=true;
+	found_errors=true;
 	return;
     }
   }
-  if (metadataPrefix.length() == 0 && resumptionToken.length() == 0) {
+  if (metadata_prefix.empty() && resumption_token.empty()) {
     std::cout << "  <request>https://rda.ucar.edu/cgi-bin/oai</request>" << std::endl;
     std::cout << "  <error code=\"badArgument\">'metadataPrefix' is missing</error>" << std::endl;
-    foundErrors=true;
+    found_errors=true;
     return;
   }
-  printRequestElement();
-if (set.length() > 0) {
+  print_request_element();
+if (!set.empty()) {
 std::cout << "  <error code=\"noSetHierarchy\">Sets not supported</error>" << std::endl;
-foundErrors=true;
+found_errors=true;
 return;
 }
-if (resumptionToken.length() > 0) {
+if (!resumption_token.empty()) {
 std::cout << "  <error code=\"badResumptionToken\" />" << std::endl;
-foundErrors=true;
+found_errors=true;
 return;
 }
-  checkFormats(metadataPrefix);
+  check_formats(metadata_prefix);
   wc="type != 'I' and type != 'W' and type != 'D' and dsid != '999.9'";
-  if (from.length() > 0) {
+  if (!from.empty()) {
     if (strutils::contains(from,"T")) {
 	strutils::replace_all(from,"T"," ");
 	strutils::chop(from);
@@ -302,7 +304,7 @@ return;
 	from+=" 00:00:00";
     wc+=" and timestamp_Z >= '"+from+"'";
   }
-  if (until.length() > 0) {
+  if (!until.empty()) {
     if (strutils::contains(until,"T")) {
 	strutils::replace_all(until,"T"," ");
 	strutils::chop(until);
@@ -323,20 +325,21 @@ return;
   }
 }
 
-void ListIdentifiers()
+void list_identifiers()
 {
   MySQL::LocalQuery query;
   MySQL::Row row;
-  std::string metadataPrefix,sdum;
-  bool foundErrors;
+  std::string metadata_prefix,sdum;
+  bool found_errors;
 
-  buildList(query,metadataPrefix,foundErrors);
-  if (foundErrors)
+  build_list(query,metadata_prefix,found_errors);
+  if (found_errors) {
     return;
+  }
   std::cout << "  <ListIdentifiers>" << std::endl;
   while (query.fetch_row(row)) {
     std::cout << "    <header>" << std::endl;
-    std::cout << "      <identifier>oai:" << repositoryIdentifier << ":ds" << row[0] << "</identifier>" << std::endl;
+    std::cout << "      <identifier>oai:" << REPOSITORY_IDENTIFIER << ":ds" << row[0] << "</identifier>" << std::endl;
     sdum=row[1];
     strutils::replace_all(sdum," ","T");
     std::cout << "      <datestamp>" << sdum << "Z</datestamp>" << std::endl;
@@ -345,19 +348,19 @@ void ListIdentifiers()
   std::cout << "  </ListIdentifiers>" << std::endl;
 }
 
-void ListRecords()
+void list_records()
 {
   MySQL::Server server;
-  metautils::connectToMetadataServer(server);
+  metautils::connect_to_metadata_server(server);
   MySQL::LocalQuery query;
-  std::string metadataPrefix;
-  bool foundErrors;
-  buildList(query,metadataPrefix,foundErrors);
-  if (foundErrors) {
+  std::string metadata_prefix;
+  bool found_errors;
+  build_list(query,metadata_prefix,found_errors);
+  if (found_errors) {
     return;
   }
   std::unique_ptr<TokenDocument> token_doc;
-  if (metadataPrefix == "iso19115-3") {
+  if (metadata_prefix == "iso19115-3") {
     token_doc.reset(new TokenDocument("/usr/local/www/server_root/web/html/oai/iso19115-3.xml"));
   }
   std::cout << "  <ListRecords>" << std::endl;
@@ -365,13 +368,13 @@ void ListRecords()
   while (query.fetch_row(row)) {
     std::cout << "    <record>" << std::endl;
     std::cout << "      <header>" << std::endl;
-    std::cout << "        <identifier>oai:" << repositoryIdentifier << ":ds" << row[0] << "</identifier>" << std::endl;
+    std::cout << "        <identifier>oai:" << REPOSITORY_IDENTIFIER << ":ds" << row[0] << "</identifier>" << std::endl;
     auto s=row[1];
     strutils::replace_all(s," ","T");
     std::cout << "        <datestamp>" << s << "Z</datestamp>" << std::endl;
     std::cout << "      </header>" << std::endl;
     std::cout << "      <metadata>" << std::endl;
-    metadataExport::exportMetadata(metadataPrefix,token_doc,std::cout,row[0],8);
+    metadataExport::export_metadata(metadata_prefix,token_doc,std::cout,row[0],8);
     std::cout << "      </metadata>" << std::endl;
     std::cout << "    </record>" << std::endl;
     if (token_doc != nullptr) {
@@ -381,47 +384,47 @@ void ListRecords()
   std::cout << "  </ListRecords>" << std::endl;
 }
 
-void GetRecord()
+void get_record()
 {
-  std::string dsnum,identifier,metadataPrefix,sdum;
+  std::string dsnum,identifier,metadata_prefix,sdum;
   MySQL::Server server;
   MySQL::LocalQuery query;
   MySQL::Row row;
 
-  metautils::connectToMetadataServer(server);
+  metautils::connect_to_metadata_server(server);
   for (auto& a : oai_args) {
     if (a == "identifier") {
-	identifier=queryString.getValue("identifier");
+	identifier=query_string.value("identifier");
     }
     else if (a == "metadataPrefix") {
-	metadataPrefix=strutils::to_lower(queryString.getValue("metadataPrefix"));
+	metadata_prefix=strutils::to_lower(query_string.value("metadataPrefix"));
     }
     else if (a != "verb") {
 	bad_args.emplace_back(a);
     }
   }
   if (bad_args.size() > 0) {
-    printBadArgumentsList();
+    print_bad_arguments_list();
     return;
   }
-  if (identifier.length() == 0) {
+  if (identifier.empty()) {
     std::cout << "  <request>https://rda.ucar.edu/cgi-bin/oai</request>" << std::endl;
     std::cout << "  <error code=\"badArgument\">'identifier' is missing</error>" << std::endl;
     return;
   }
-  if (!strutils::has_beginning(identifier,"oai:"+repositoryIdentifier+":ds")) {
+  if (!strutils::has_beginning(identifier,"oai:"+REPOSITORY_IDENTIFIER+":ds")) {
     std::cout << "  <request>https://rda.ucar.edu/cgi-bin/oai</request>" << std::endl;
     std::cout << "  <error code=\"badArgument\">'identifier' is not a valid oai-identifier</error>" << std::endl;
     return;
   }
-  if (metadataPrefix.length() == 0) {
+  if (metadata_prefix.empty()) {
     std::cout << "  <request>https://rda.ucar.edu/cgi-bin/oai</request>" << std::endl;
     std::cout << "  <error code=\"badArgument\">'metadataPrefix' is missing</error>" << std::endl;
     return;
   }
-  printRequestElement();
-  checkFormats(metadataPrefix);
-  dsnum=strutils::substitute(identifier,"oai:"+repositoryIdentifier+":ds","");
+  print_request_element();
+  check_formats(metadata_prefix);
+  dsnum=strutils::substitute(identifier,"oai:"+REPOSITORY_IDENTIFIER+":ds","");
   query.set("type,timestamp_Z","search.datasets","dsid = '"+dsnum+"'");
   if (query.submit(server) < 0) {
     std::cout << "Content-type: text/plain" << std::endl << std::endl;
@@ -444,14 +447,14 @@ void GetRecord()
   std::cout << "  <GetRecord>" << std::endl;
   std::cout << "    <record>" << std::endl;
   std::cout << "      <header>" << std::endl;
-  std::cout << "        <identifier>oai:" << repositoryIdentifier << ":ds" << dsnum << "</identifier>" << std::endl;
+  std::cout << "        <identifier>oai:" << REPOSITORY_IDENTIFIER << ":ds" << dsnum << "</identifier>" << std::endl;
   sdum=row[1];
   strutils::replace_all(sdum," ","T");
   std::cout << "        <datestamp>" << sdum << "Z</datestamp>" << std::endl;
   std::cout << "      </header>" << std::endl;
   std::cout << "      <metadata>" << std::endl;
   std::unique_ptr<TokenDocument> token_doc;
-  metadataExport::exportMetadata(metadataPrefix,token_doc,std::cout,dsnum,8);
+  metadataExport::export_metadata(metadata_prefix,token_doc,std::cout,dsnum,8);
   std::cout << "      </metadata>" << std::endl;
   std::cout << "    </record>" << std::endl;
   std::cout << "  </GetRecord>" << std::endl;
@@ -461,39 +464,39 @@ int main(int argc,char **argv)
 {
   DateTime dt;
 
-  metautils::readConfig("oai","","");
+  metautils::read_config("oai","","");
   std::cout << "Content-type: text/xml" << std::endl << std::endl;
   std::cout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
   std::cout << "<OAI-PMH xmlns=\"http://www.openarchives.org/OAI/2.0/\"" << std::endl;
   std::cout << "         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" << std::endl;
   std::cout << "         xsi:schemaLocation=\"http://www.openarchives.org/OAI/2.0/" << std::endl;
   std::cout << "                             http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd\">" << std::endl;
-  dt=getCurrentDateTime();
-  if (dt.getUTCOffset() == -700) {
-    dt.addHours(7);
+  dt=current_date_time();
+  if (dt.utc_offset() == -700) {
+    dt.add_hours(7);
   }
   else {
-    dt.addHours(6);
+    dt.add_hours(6);
   }
-  std::cout << "  <responseDate>" << dt.toString("%Y-%m-%dT%H:%MM:%SSZ") << "</responseDate>" << std::endl;
-  parseQuery();
+  std::cout << "  <responseDate>" << dt.to_string("%Y-%m-%dT%H:%MM:%SSZ") << "</responseDate>" << std::endl;
+  parse_query();
   if (verb == "Identify") {
-    Identify();
+    identify();
   }
   else if (verb == "ListMetadataFormats") {
-    ListMetadataFormats();
+    list_metadata_formats();
   }
   else if (verb == "ListSets") {
-    ListSets();
+    list_sets();
   }
   else if (verb == "ListIdentifiers") {
-    ListIdentifiers();
+    list_identifiers();
   }
   else if (verb == "ListRecords") {
-    ListRecords();
+    list_records();
   }
   else if (verb == "GetRecord") {
-    GetRecord();
+    get_record();
   }
   else {
     std::cout << "  <error code=\"badVerb\" />" << std::endl;
