@@ -3,7 +3,7 @@
     <gco:CharacterString>edu.ucar.rda::ds__DSNUM__</gco:CharacterString>
   </gmd:fileIdentifier>
   <gmd:language>
-    <gco:CharacterString>eng</gco:CharacterString>
+    <gmd:LanguageCode codeList="http://www.loc.gov/standards/iso639-2/" codeListValue="eng; USA">eng; USA</gmd:LanguageCode>
   </gmd:language>
   <gmd:characterSet>
     <gmd:MD_CharacterSetCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_CharacterSetCode" codeListValue="utf-8">utf-8</gmd:MD_CharacterSetCode>
@@ -66,11 +66,33 @@
   <gmd:dataSetURI>
 #IF __HAS_DOI__
     <gco:CharacterString>https://doi.org/__DOI__</gco:CharacterString>
-#ENDIF
-#IF __NO_DOI__
+#ENDIF __HAS_DOI__
+#ELSE __HAS_DOI__
     <gco:CharacterString>https://rda.ucar.edu/datasets/ds__DSNUM__/</gco:CharacterString>
-#ENDIF
+#ENDELSE __HAS_DOI__
   </gmd:dataSetURI>
+#REPEAT __RELATED_RESOURCE__
+  <gmd:metadataExtensionInfo>
+    <gmd:MD_MetadataExtensionInformation>
+      <gmd:extensionOnLineResource>
+        <gmd:CI_OnlineResource>
+          <gmd:linkage>
+            <gmd:URL>__RELATED_RESOURCE__.URL</gmd:URL>
+          </gmd:linkage>
+          <gmd:protocol>
+            <gco:CharacterString>__RELATED_RESOURCE__.PROTOCOL</gco:CharacterString>
+          </gmd:protocol>
+          <gmd:applicationProfile>
+            <gco:CharacterString>browser</gco:CharacterString>
+          </gmd:applicationProfile>
+          <gmd:description>
+            <gco:CharacterString>__RELATED_RESOURCE__.DESCRIPTION</gco:CharacterString>
+          </gmd:description>
+        </gmd:CI_OnlineResource>
+      </gmd:extensionOnLineResource>
+    </gmd:MD_MetadataExtensionInformation>
+  </gmd:metadataExtensionInfo>
+#ENDREPEAT __RELATED_RESOURCE__
   <gmd:identificationInfo>
     <gmd:MD_DataIdentification>
       <gmd:citation>
@@ -102,7 +124,7 @@
             </gmd:CI_ResponsibleParty>
           </gmd:citedResponsibleParty>
 #ENDREPEAT __AUTHOR_PERSON__
-#ENDIF
+#ENDIF __HAS_AUTHOR_PERSONS__
 #IF __HAS_AUTHOR_ORGS__
 #REPEAT __AUTHOR_ORG__
           <gmd:citedResponsibleParty>
@@ -115,8 +137,8 @@
               </gmd:role>
             </gmd:CI_ResponsibleParty>
           </gmd:citedResponsibleParty>
-#ENDREPEAT
-#ENDIF
+#ENDREPEAT __AUTHOR_ORG__
+#ENDIF __HAS_AUTHOR_ORGS__
           <gmd:citedResponsibleParty>
             <gmd:CI_ResponsibleParty>
               <gmd:organisationName><gco:CharacterString>Research Data Archive at the National Center for Atmospheric Research, Computational and Information Systems Laboratory</gco:CharacterString></gmd:organisationName>
@@ -138,6 +160,9 @@
           <gmd:individualName>
             <gco:CharacterString>__SPECIALIST_NAME__</gco:CharacterString>
           </gmd:individualName>
+          <gmd:organisationName>
+            <gco:CharacterString>UCAR/NCAR - Research Data Archive</gco:CharacterString>
+          </gmd:organisationName>
           <gmd:contactInfo>
             <gmd:CI_Contact>
               <gmd:phone>
@@ -203,7 +228,7 @@
           <gmd:fileType><gco:CharacterString>__LOGO_IMAGE_FORMAT__</gco:CharacterString></gmd:fileType>
         </gmd:MD_BrowseGraphic>
       </gmd:graphicOverview>
-#ENDIF
+#ENDIF __HAS_LOGO__
 #IF __HAS_FORMATS__
 #REPEAT __FORMAT__
       <gmd:resourceFormat>
@@ -214,8 +239,8 @@
           <gmd:version gco:nilReason="inapplicable" />
         </gmd:MD_Format>
       </gmd:resourceFormat>
-#ENDREPEAT
-#ENDIF
+#ENDREPEAT __FORMAT__
+#ENDIF __HAS_FORMATS__
       <gmd:descriptiveKeywords>
         <gmd:MD_Keywords>
           <gmd:keyword>
@@ -263,7 +288,7 @@
           <gmd:keyword>
             <gco:CharacterString>__PLATFORM__</gco:CharacterString>
           </gmd:keyword>
-#ENDREPEAT
+#ENDREPEAT __PLATFORM__
           <gmd:thesaurusName>
             <gmd:CI_Citation>
               <gmd:title>
@@ -302,7 +327,7 @@
           </gmd:thesaurusName>
         </gmd:MD_Keywords>
       </gmd:descriptiveKeywords>
-#ENDIF
+#ENDIF __HAS_PLATFORMS__
 #IF __HAS_INSTRUMENTS__
       <gmd:descriptiveKeywords>
         <gmd:MD_Keywords>
@@ -310,7 +335,7 @@
           <gmd:keyword>
             <gco:CharacterString>__INSTRUMENT__</gco:CharacterString>
           </gmd:keyword>
-#ENDREPEAT
+#ENDREPEAT __INSTRUMENT__
           <gmd:thesaurusName>
             <gmd:CI_Citation>
               <gmd:title>
@@ -349,7 +374,7 @@
           </gmd:thesaurusName>
         </gmd:MD_Keywords>
       </gmd:descriptiveKeywords>
-#ENDIF
+#ENDIF __HAS_INSTRUMENTS__
 #IF __HAS_PROJECTS__
       <gmd:descriptiveKeywords>
         <gmd:MD_Keywords>
@@ -357,7 +382,7 @@
           <gmd:keyword>
             <gco:CharacterString>__PROJECT__</gco:CharacterString>
           </gmd:keyword>
-#ENDREPEAT
+#ENDREPEAT __PROJECT__
           <gmd:thesaurusName>
             <gmd:CI_Citation>
               <gmd:title>
@@ -396,14 +421,14 @@
           </gmd:thesaurusName>
         </gmd:MD_Keywords>
       </gmd:descriptiveKeywords>
-#ENDIF
+#ENDIF __HAS_PROJECTS__
       <gmd:descriptiveKeywords>
         <gmd:MD_Keywords>
 #REPEAT __SCIENCEKEYWORD__
           <gmd:keyword>
             <gco:CharacterString>__SCIENCEKEYWORD__</gco:CharacterString>
           </gmd:keyword>
-#ENDREPEAT
+#ENDREPEAT __SCIENCEKEYWORD__
           <gmd:thesaurusName>
             <gmd:CI_Citation>
               <gmd:title>
@@ -448,36 +473,39 @@
           <gmd:useLimitation>
             <gco:CharacterString>__USAGE_RESTRICTIONS__</gco:CharacterString>
           </gmd:useLimitation>
-#ENDIF
-#IF __NO_USAGE_RESTRICTIONS__
+#ENDIF __HAS_USAGE_RESTRICTIONS__
+#ELSE __HAS_USAGE_RESTRICTIONS__
           <gmd:useLimitation>
             <gco:CharacterString>Use of this dataset is subject to UCAR's Terms of Use, except that commercial use is generally not prohibited.</gco:CharacterString>
           </gmd:useLimitation>
-#ENDIF
+#ENDELSE __HAS_USAGE_RESTRICTIONS__
 #IF __HAS_ACCESS_RESTRICTIONS__
           <gmd:otherConstraints>
             <gco:CharacterString>__ACCESS_RESTRICTIONS__</gco:CharacterString>
           </gmd:otherConstraints>
-#IF __NO_ACCESS_RESTRICTIONS__
+#ENDIF __HAS_ACCESS_RESTRICTIONS__
+#ELSE __HAS_ACCESS_RESTRICTIONS__
           <gmd:otherConstraints>
             <gco:CharacterString>Registration on the RDA web site is a requirement for access to the data.</gco:CharacterString>
           </gmd:otherConstraints>
-#ENDIF
+#ENDELSE __HAS_ACCESS_RESTRICTIONS__
         </gmd:MD_LegalConstraints>
       </gmd:resourceConstraints>
 #IF __IS_GRID__
       <gmd:spatialRepresentationType>
         <gmd:MD_SpatialRepresentationTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_SpatialRepresentationTypeCode" codeListValue="grid">grid</gmd:MD_SpatialRepresentationTypeCode>
       </gmd:spatialRepresentationType>
-#ENDIF
+#ENDIF __IS_GRID__
       <gmd:language>
         <gco:CharacterString>eng</gco:CharacterString>
       </gmd:language>
       <gmd:topicCategory>
         <gmd:MD_TopicCategoryCode>__ISO_TOPIC__</gmd:MD_TopicCategoryCode>
       </gmd:topicCategory>
+#IF __HAS_ANY_EXTENT__
       <gmd:extent>
         <gmd:EX_Extent>
+#ENDIF __HAS_ANY_EXTENT__
 #IF __HAS_POINT__
           <gmd:geographicElement>
             <gmd:EX_BoundingPolygon>
@@ -506,7 +534,7 @@
               </gmd:northBoundLatitude>
             </gmd:EX_GeographicBoundingBox>
           </gmd:geographicElement>
-#ENDIF
+#ENDIF __HAS_BOUNDING_BOX__
 #IF __HAS_GEOGRAPHIC_IDENTIFIERS__
 #REPEAT __GEOGRAPHIC_IDENTIFIER__
           <gmd:geographicElement>
@@ -556,8 +584,9 @@
               </gmd:geographicIdentifier>
             </gmd:EX_GeographicDescription>
           </gmd:geographicElement>
-#ENDREPEAT
-#ENDIF
+#ENDREPEAT __GEOGRAPHIC_IDENTIFIER__
+#ENDIF __HAS_GEOGRAPHIC_IDENTIFIERS__
+#IF __HAS_TEMPORAL_EXTENT__
           <gmd:temporalElement>
             <gmd:EX_TemporalExtent>
               <gmd:extent>
@@ -568,8 +597,11 @@
               </gmd:extent>
             </gmd:EX_TemporalExtent>
           </gmd:temporalElement>
+#ENDIF __HAS_TEMPORAL_EXTENT__
+#IF __HAS_ANY_EXTENT__
         </gmd:EX_Extent>
       </gmd:extent>
+#ENDIF __HAS_ANY_EXTENT__
     </gmd:MD_DataIdentification>
   </gmd:identificationInfo>
   <gmd:distributionInfo>
@@ -621,13 +653,18 @@
       </gmd:distributor>
       <gmd:transferOptions>
         <gmd:MD_DigitalTransferOptions>
+#IF __VOLUME_SPECIFIED__
+         <gmd:transferSize>
+           <gco:Real>__MB_VOLUME__</gco:Real>
+         </gmd:transferSize>
+#ENDIF __VOLUME_SPECIFIED__
           <gmd:onLine>
             <gmd:CI_OnlineResource>
               <gmd:linkage>
                 <gmd:URL>https://rda.ucar.edu/datasets/ds__DSNUM__/</gmd:URL>
               </gmd:linkage>
               <gmd:protocol>
-                <gco:CharacterString>http</gco:CharacterString>
+                <gco:CharacterString>https</gco:CharacterString>
               </gmd:protocol>
               <gmd:applicationProfile>
                 <gco:CharacterString>browser</gco:CharacterString>
@@ -643,10 +680,6 @@
               </gmd:function>
             </gmd:CI_OnlineResource>
           </gmd:onLine>
-        </gmd:MD_DigitalTransferOptions>
-      </gmd:transferOptions>
-      <gmd:transferOptions>
-        <gmd:MD_DigitalTransferOptions>
           <gmd:onLine>
             <gmd:CI_OnlineResource>
               <gmd:linkage>
