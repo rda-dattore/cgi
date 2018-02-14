@@ -86,8 +86,11 @@
             <gco:CharacterString>browser</gco:CharacterString>
           </gmd:applicationProfile>
           <gmd:name>
-            <gco:CharacterString>__RELATED_RESOURCE__.DESCRIPTION</gco:CharacterString>
+            <gco:CharacterString>__RELATED_RESOURCE__.NAME</gco:CharacterString>
           </gmd:name>
+          <gmd:description>
+            <gco:CharacterString>__RELATED_RESOURCE__.DESCRIPTION</gco:CharacterString>
+          </gmd:description>
         </gmd:CI_OnlineResource>
       </gmd:extensionOnLineResource>
     </gmd:MD_MetadataExtensionInformation>
