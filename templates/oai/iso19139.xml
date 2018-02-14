@@ -499,6 +499,15 @@
         <gmd:MD_SpatialRepresentationTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_SpatialRepresentationTypeCode" codeListValue="grid">grid</gmd:MD_SpatialRepresentationTypeCode>
       </gmd:spatialRepresentationType>
 #ENDIF __IS_GRID__
+#REPEAT __SPATIAL_RESOLUTION__
+      <gmd:spatialResolution>
+        <gmd:MD_Resolution>
+          <gmd:distance>
+            <gco:Distance uom="__SPATIAL_RESOLUTION__.UOM">__SPATIAL_RESOLUTION__.RESOLUTION</gco:Distance>
+          </gmd:distance>
+        </gmd:MD_Resolution>
+      </gmd:spatialResolution>
+#ENDREPEAT __SPATIAL_RESOLUTION__
       <gmd:language>
         <gco:CharacterString>eng</gco:CharacterString>
       </gmd:language>
