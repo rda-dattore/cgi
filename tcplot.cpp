@@ -19,9 +19,9 @@ struct Args {
 float minlat=90.,minlon=360.,maxlat=-90.,maxlon=-360.;
 short colidx[]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},nidx=0;
 std::string txt[]={"","","","","","","","","Hurricane - Cat 5","Hurricane - Cat 4","Hurricane - Cat 3","Hurricane - Cat 2","Hurricane - Cat 1","Tropical Storm","Tropical Depression","Extratropical/Remnant Low","Subtropical Storm"};
-std::string server_root="/"+strutils::token(host_name(),".",0);
-std::string doc_root=getenv("DOCUMENT_ROOT");
-std::string data_root="/glade/p/rda/data";
+const std::string SERVER_ROOT="/usr/local/www/server_root";
+const std::string DOC_ROOT=getenv("DOCUMENT_ROOT");
+webutils::Directives directives;
 
 void parse_query()
 {
@@ -166,7 +166,7 @@ bool compare_seasons(std::string& left,std::string& right)
 void get_season()
 {
   std::cout << "Content-type: text/html" << std::endl << std::endl;
-  std::ifstream ifs((doc_root+"/datasets/ds824.1/inventories/"+args.ocean+".inv").c_str());
+  std::ifstream ifs((DOC_ROOT+"/datasets/ds824.1/inventories/"+args.ocean+".inv").c_str());
   if (ifs.is_open()) {
     std::cout << "Choose a season: <select name=\"y\" onChange=\"getStormNumber()\"><option value=\"\" selected>choose one</option>";
     char line[32768];
@@ -191,7 +191,7 @@ void get_season()
 void get_storm_number()
 {
   std::cout << "Content-type: text/html" << std::endl << std::endl;
-  std::ifstream ifs((doc_root+"/datasets/ds824.1/inventories/"+args.ocean+".inv").c_str());
+  std::ifstream ifs((DOC_ROOT+"/datasets/ds824.1/inventories/"+args.ocean+".inv").c_str());
   if (ifs.is_open()) {
     std::cout << "Choose a storm: <select name=\"s\" onChange=\"getPlotType()\")\"><option value=\"\" selected>choose one</option>";
     char line[32768];
@@ -227,7 +227,7 @@ void get_plot_type()
   std::cout << "Plot Type: <select name=\"p\"><option value=\"single\" selected>Track w/intensities</option>";
   for (const auto& fcst : fcsts) {
     auto found=false;
-    std::ifstream ifs((doc_root+"/datasets/ds824.1/inventories/"+args.ocean+fcst+".inv").c_str());
+    std::ifstream ifs((DOC_ROOT+"/datasets/ds824.1/inventories/"+args.ocean+fcst+".inv").c_str());
     if (ifs.is_open()) {
 	char line[32768];
 	ifs.getline(line,32768);
@@ -262,7 +262,7 @@ void get_plot_type()
 void add_forecast(std::string storm_name,std::string& fcst_string,int fcst_hr,DateTime& last_date)
 {
   DateTime date(1000,1,1,0,0);
-  std::ifstream ifs((data_root+"/ds824.1/"+args.ocean+"_f"+strutils::itos(fcst_hr)+".dat").c_str());
+  std::ifstream ifs((directives.data_root+"/ds824.1/"+args.ocean+"_f"+strutils::itos(fcst_hr)+".dat").c_str());
   if (ifs.is_open()) {
     storm_name=strutils::to_upper(storm_name);
     char line[32768];
@@ -346,7 +346,7 @@ void plot_image(std::string tfile_name,std::string image_name)
     std::cout << "-----" << std::endl;
   }
   else {
-    if (mysystem2("/bin/tcsh -c \"source /etc/profile.d/ncarg.csh; /usr/bin/ctrans -d sun -res "+args.resolution+" "+server_root+"/tmp/"+image_name+".ncgm |convert sun:- gif:-; rm "+server_root+"/tmp/"+image_name+".ncgm\"",oss,ess) < 0) {
+    if (mysystem2("/bin/tcsh -c \"source /etc/profile.d/ncarg.csh; /usr/bin/ctrans -d sun -res "+args.resolution+" "+SERVER_ROOT+"/tmp/"+image_name+".ncgm |convert sun:- gif:-; rm "+SERVER_ROOT+"/tmp/"+image_name+".ncgm\"",oss,ess) < 0) {
 	std::cout << "Content-type: text/plain" << std::endl << std::endl;
 	std::cout << ess.str() << std::endl;
     }
@@ -360,11 +360,11 @@ void plot_image(std::string tfile_name,std::string image_name)
 void plot_single()
 {
   strutils::replace_all(args.storm_number,"**","");
-  TokenDocument token_doc("/usr/local/www/server_root/web/html/tcplot/plot_single.ncl");
-  token_doc.add_replacement("__SERVER_ROOT__",server_root);
+  TokenDocument token_doc(SERVER_ROOT+"/web/html/tcplot/plot_single.ncl");
+  token_doc.add_replacement("__SERVER_ROOT__",SERVER_ROOT);
   auto img=strutils::strand(12);
   token_doc.add_replacement("__IMAGE_NAME__",img);
-  std::ifstream ifs((data_root+"/ds824.1/"+args.ocean+".dat").c_str());
+  std::ifstream ifs((directives.data_root+"/ds824.1/"+args.ocean+".dat").c_str());
   if (!ifs.is_open()) {
     web_error("unable to open data file");
   }
@@ -528,7 +528,7 @@ void plot_single()
   }
   token_doc.add_replacement("__FIRST_DATE__",first_date.to_string("%m/%d %HZ"));
   token_doc.add_replacement("__LAST_DATE__",last_date.to_string("%m/%d %HZ"));
-  TempFile tfile(server_root+"/tmp");
+  TempFile tfile(SERVER_ROOT+"/tmp");
   std::ofstream ofs(tfile.name());
   if (!ofs.is_open()) {
     web_error("unable to create output");
@@ -540,9 +540,9 @@ void plot_single()
 
 void plot_vs_forecast()
 {
-  TokenDocument token_doc("/usr/local/www/server_root/web/html/tcplot/plot_vs_forecast.ncl");
+  TokenDocument token_doc(SERVER_ROOT+"/web/html/tcplot/plot_vs_forecast.ncl");
   auto img=strutils::strand(12);
-  token_doc.add_replacement("__SERVER_ROOT__",server_root);
+  token_doc.add_replacement("__SERVER_ROOT__",SERVER_ROOT);
   token_doc.add_replacement("__IMAGE_NAME__",img);
   bool is_best;
   if (std::regex_search(args.storm_number,std::regex("^\\*\\*"))) {
@@ -554,7 +554,7 @@ void plot_vs_forecast()
   }
 // get forecast positions
   auto fcst_hr=strutils::substitute(args.plot_type,"vsfcst","");
-  std::ifstream ifs((data_root+"/ds824.1/"+args.ocean+"_f"+fcst_hr+".dat").c_str());
+  std::ifstream ifs((directives.data_root+"/ds824.1/"+args.ocean+"_f"+fcst_hr+".dat").c_str());
   if (!ifs.is_open()) {
     web_error("unable to open data file");
   }
@@ -650,10 +650,10 @@ void plot_vs_forecast()
   ifs.close();
 // get actual track
   if (is_best) {
-    ifs.open((data_root+"/ds824.1/"+args.ocean+".dat").c_str());
+    ifs.open((directives.data_root+"/ds824.1/"+args.ocean+".dat").c_str());
   }
   else {
-    ifs.open((data_root+"/ds824.1/"+args.ocean+"_f00.dat").c_str());
+    ifs.open((directives.data_root+"/ds824.1/"+args.ocean+"_f00.dat").c_str());
   }
   auto first_fpoint=999999;
   ifs.getline(line,32768);
@@ -802,7 +802,7 @@ void plot_vs_forecast()
 	token_doc.add_replacement("__Y__",strutils::ftos(y,4));
     }
   }
-  TempFile tfile(server_root+"/tmp");
+  TempFile tfile(SERVER_ROOT+"/tmp");
   std::ofstream ofs(tfile.name());
   if (!ofs.is_open()) {
     web_error("unable to create output");
@@ -814,6 +814,9 @@ void plot_vs_forecast()
 
 int main(int argc,char **argv)
 {
+  if (!webutils::read_config(directives)) {
+    web_error("unable to read web configuration");
+  }
   parse_query();
   if (!args.ocean.empty() && !args.season.empty() && !args.storm_number.empty() && !args.plot_type.empty()) {
     if (args.plot_type == "single") {
