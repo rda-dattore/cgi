@@ -7,11 +7,15 @@
 #include <metadata.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
+#include <gridutils.hpp>
 #include <search.hpp>
 #include <bsort.hpp>
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
+std::string myerror="";
+std::string mywarning="";
+
 struct LocalArgs {
   LocalArgs() : refine_by(),browse_by(),browse_value(),origin(),browse_by_list(),browse_value_list(),lkey(),from_home_page(),refine_color(),compare_list(),new_browse(false),display_cache(false) {}
 
@@ -219,17 +223,12 @@ extern "C" void *summarizeGridProducts(void *gpstruct)
 
 extern "C" void *summarizeGridCoverages(void *gcstruct)
 {
-  MySQL::Query query;
-  MySQL::Row row;
   GridCoverages *g=(GridCoverages *)gcstruct;
-  std::string sdum;
-
   MySQL::Server tserver(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  query.set("select distinct d.definition,d.defParams from "+g->table+" as s left join GrML.gridDefinitions as d on d.code = s.gridDefinition_code where s.dsid = '"+g->dsnum+"'");
+  MySQL::Query query("select distinct d.definition,d.defParams from "+g->table+" as s left join GrML.gridDefinitions as d on d.code = s.gridDefinition_code where s.dsid = '"+g->dsnum+"'");
   if (query.submit(tserver) == 0) {
-    while (query.fetch_row(row)) {
-	sdum=row[0]+"<!>"+row[1];
-	g->coverages.push_back(sdum);
+    for (const auto& row : query) {
+	g->coverages.emplace_back(row[0]+"<!>"+row[1]);
     }
   }
   tserver.disconnect();
@@ -846,7 +845,7 @@ void showDatasetsAfterProcessing(MySQL::LocalQuery& query,int num_entries,bool d
 	    std::cout << "<input type=\"checkbox\" name=\"cmp\" value=\"" << row[0] << "\">&nbsp;";
 	  }
 	  std::cout << sdum << ". <a class=\"underline\" href=\"/datasets/ds" << row[0] << "/\" target=\"_blank\"><b>" << row[1] << "</b></a> <span class=\"mediumGrayText\">(ds" << row[0] << ")</span><br>" << std::endl;
-	  std::cout << "<div class=\"browseSummary\">" << convertToExpandableSummary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator) << "</div>" << std::endl;
+	  std::cout << "<div class=\"browseSummary\">" << searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator) << "</div>" << std::endl;
 	  std::cout << "</div><br>" << std::endl;
 	  ++n;
 	}
@@ -886,7 +885,7 @@ void showDatasetsFromQuery(MySQL::LocalQuery& query,bool display_results)
 	  std::cout << "<input type=\"checkbox\" name=\"cmp\" value=\""+row[0]+"\">&nbsp;";
 	}
 	std::cout << sdum+". <a class=\"underline\" href=\"/datasets/ds"+row[0]+"/\" target=\"_blank\" itemprop=\"url\"><b itemprop=\"name\">"+row[1]+"</b></a> <span class=\"mediumGrayText\">(ds"+row[0]+")</span><br>" << std::endl;
-	std::cout << "<div class=\"browseSummary\" itemprop=\"description\">"+convertToExpandableSummary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator)+"</div>" << std::endl;
+	std::cout << "<div class=\"browseSummary\" itemprop=\"description\">"+searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator)+"</div>" << std::endl;
 	std::cout << "</div><br>" << std::endl;
 	++n;
     }
@@ -1036,7 +1035,7 @@ void browse(bool display_results = true)
 	}
 	else {
 	  sdum=sp[n];
-	  sword=getCleanSearchWord(sdum,ignore);
+	  sword=searchutils::cleaned_search_word(sdum,ignore);
 	  if (include_words.length() > 0) {
 	    include_words+=" or ";
 	  }
@@ -1129,7 +1128,7 @@ void display_cache()
 	  std::cout << "<input type=\"checkbox\" name=\"cmp\" value=\"" << row[0] << "\">&nbsp;";
 	}
 	std::cout << snum << ". <a class=\"underline\" href=\"/datasets/ds" << row[0] << "/\" target=\"_blank\"><b>" << row[1] << "</b></a> <span class=\"mediumGrayText\">(ds" << row[0] << ")</span><br>" << std::endl;
-	std::cout << "<div class=\"browseSummary\">" << convertToExpandableSummary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator) << "</div>" << std::endl;
+	std::cout << "<div class=\"browseSummary\">" << searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator) << "</div>" << std::endl;
 	std::cout << "</div><br>" << std::endl;
 	++n;
     }
@@ -1629,18 +1628,20 @@ void compare()
     std::cout << "</td></tr>" << std::endl;
     std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Grid Resolution and Coverage</th><td class=\"bg0\" align=\"left\">";
     if (table_exists(server,table1)) {
-	for (auto coverage : gc1.coverages) {
-	  if (gc1.coverages.size() > 1)
+	for (const auto& coverage : gc1.coverages) {
+	  if (gc1.coverages.size() > 1) {
 	    std::cout << "&bull;&nbsp;";
-	  std::cout << convertGridDefinition(coverage)+"<br>";
+	  }
+	  std::cout << gridutils::convert_grid_definition(coverage)+"<br>";
 	}
     }
     std::cout << "</td><td class=\"bg0\" align=\"left\">";
     if (table_exists(server,table2)) {
-	for (auto coverage : gc2.coverages) {
-	  if (gc2.coverages.size() > 1)
+	for (const auto& coverage : gc2.coverages) {
+	  if (gc2.coverages.size() > 1) {
 	    std::cout << "&bull;&nbsp;";
-	  std::cout << convertGridDefinition(coverage)+"<br>";
+	  }
+	  std::cout << gridutils::convert_grid_definition(coverage)+"<br>";
 	}
     }
     std::cout << "</td></tr>" << std::endl;
