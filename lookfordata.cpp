@@ -10,8 +10,8 @@
 #include <search.hpp>
 #include <bsort.hpp>
 
-metautils::Directives directives;
-metautils::Args args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
 struct LocalArgs {
   LocalArgs() : refine_by(),browse_by(),browse_value(),origin(),browse_by_list(),browse_value_list(),lkey(),from_home_page(),refine_color(),compare_list(),new_browse(false),display_cache(false) {}
 
@@ -31,7 +31,7 @@ my::map<DsEntry> prev_results_table(999);
 const size_t EXPANDABLE_SUMMARY_LENGTH=30;
 std::string bgcolors[2];
 std::string http_host=getenv("HTTP_HOST");
-std::string server_root="/"+strutils::token(getHostName(),".",0);
+std::string server_root="/"+strutils::token(unixutils::host_name(),".",0);
 std::ofstream cache;
 struct BreadCrumbsEntry {
   BreadCrumbsEntry() : key(),count(nullptr) {}
@@ -88,14 +88,9 @@ struct GridCoverages {
 };
 const std::string INDEXABLE_DATASET_CONDITIONS="(d.type = 'P' or d.type = 'H') and d.dsid != '999.8' and d.dsid != '999.9'";
 
-int compareStrings(std::string& left,std::string& right)
+bool compare_strings(std::string& left,std::string& right)
 {
-  if (left <= right) {
-    return -1;
-  }
-  else {
-    return 1;
-  }
+  return (left < right);
 }
 
 bool sortnhourKeys(const std::string& left,const std::string& right)
@@ -126,7 +121,6 @@ bool sortnhourKeys(const std::string& left,const std::string& right)
 
 extern "C" void *summarizeGridProducts(void *gpstruct)
 {
-  MySQL::Server tserver;
   MySQL::Query query;
   MySQL::Row row;
   GridProducts *g=(GridProducts *)gpstruct;
@@ -134,7 +128,7 @@ extern "C" void *summarizeGridProducts(void *gpstruct)
   size_t fidx,aidx,cidx,zidx;
   StringEntry se;
 
-  metautils::connectToMetadataServer(tserver);
+  MySQL::Server tserver(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   g->found_analyses=false;
   query.set("select distinct t.timeRange from (select distinct timeRange_code from "+g->table+") as g left join GrML.timeRanges as t on t.code = g.timeRange_code");
   if (query.submit(tserver) == 0) {
@@ -225,13 +219,12 @@ extern "C" void *summarizeGridProducts(void *gpstruct)
 
 extern "C" void *summarizeGridCoverages(void *gcstruct)
 {
-  MySQL::Server tserver;
   MySQL::Query query;
   MySQL::Row row;
   GridCoverages *g=(GridCoverages *)gcstruct;
   std::string sdum;
 
-  metautils::connectToMetadataServer(tserver);
+  MySQL::Server tserver(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   query.set("select distinct d.definition,d.defParams from "+g->table+" as s left join GrML.gridDefinitions as d on d.code = s.gridDefinition_code where s.dsid = '"+g->dsnum+"'");
   if (query.submit(tserver) == 0) {
     while (query.fetch_row(row)) {
@@ -380,7 +373,7 @@ void read_cache()
     ifs.close();
     if (tfile != NULL) {
 	std::stringstream oss,ess;
-	mysystem2("/bin/mv "+tfile->name()+" "+server_root+"/tmp/browse."+local_args.lkey,oss,ess);
+	unixutils::mysystem2("/bin/mv "+tfile->name()+" "+server_root+"/tmp/browse."+local_args.lkey,oss,ess);
     }
   }
 }
@@ -393,40 +386,40 @@ void parseQuery()
   if (!queryString) {
     std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
   }
-  sdum=queryString.getValue("nb");
+  sdum=queryString.value("nb");
   if (sdum == "y") {
     local_args.new_browse=true;
   }
-  sdum=queryString.getValue("dc");
+  sdum=queryString.value("dc");
   if (sdum == "y") {
     local_args.display_cache=true;
   }
-  local_args.refine_by=queryString.getValue("r");
-  local_args.browse_by_list=queryString.getValues("b");
+  local_args.refine_by=queryString.value("r");
+  local_args.browse_by_list=queryString.values("b");
   if (local_args.browse_by_list.size() < 2) {
-    local_args.browse_by=queryString.getValue("b");
+    local_args.browse_by=queryString.value("b");
   }
-  local_args.browse_value_list=queryString.getValues("v");
+  local_args.browse_value_list=queryString.values("v");
   if (local_args.browse_value_list.size() < 2) {
-    local_args.browse_value=queryString.getValue("v");
+    local_args.browse_value=queryString.value("v");
   }
-  local_args.origin=queryString.getValue("o");
+  local_args.origin=queryString.value("o");
   if (local_args.browse_by_list.size() != local_args.browse_value_list.size()) {
     std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
   }
   if (local_args.browse_by_list.size() > 1) {
     local_args.new_browse=true;
   }
-  local_args.from_home_page=queryString.getValue("hp");
-  local_args.refine_color=queryString.getValue("rc");
+  local_args.from_home_page=queryString.value("hp");
+  local_args.refine_color=queryString.value("rc");
   if (local_args.refine_color.length() == 0) {
     local_args.refine_color="#eafaff";
   }
   if (local_args.browse_by == "type") {
     local_args.browse_value=strutils::substitute(strutils::to_lower(local_args.browse_value)," ","_");
   }
-  local_args.lkey=getValueFromCookie("lkey");
-  local_args.compare_list=queryString.getValues("cmp");
+  local_args.lkey=value_from_cookie("lkey");
+  local_args.compare_list=queryString.values("cmp");
   if (!local_args.new_browse) {
     read_cache();
   }
@@ -441,9 +434,8 @@ void parseQuery()
 
 void parseRefineQuery(MySQL::Query& query)
 {
-  metautils::readConfig("lookfordata","","");
-  MySQL::Server server;
-  metautils::connectToMetadataServer(server);
+  metautils::read_config("lookfordata","","");
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   my::map<CountEntry> keyword_count_table;
   if (query.submit(server) == 0) {
     MySQL::Row row;
@@ -907,12 +899,10 @@ void showDatasetsFromQuery(MySQL::LocalQuery& query,bool display_results)
 
 void parseBrowseQuery(MySQL::LocalQuery& query,int num_entries,bool display_results)
 {
-  MySQL::Server server;
-
   bgcolors[0]="#ffffff";
   bgcolors[1]="#f8fcff";
-  metautils::readConfig("lookfordata","","");
-  metautils::connectToMetadataServer(server);
+  metautils::read_config("lookfordata","","");
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (query.submit(server) == 0) {
     if (prev_results_table.size() > 0) {
 	showDatasetsAfterProcessing(query,num_entries,display_results);
@@ -1068,7 +1058,7 @@ void browse(bool display_results = true)
 	std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
     }
     else {
-	query.set("select d.dsid,d.title,d.summary,d.type,max(mssdate) as dm from dssdb.dataset as m left join search.datasets as d on concat('ds',d.dsid) = m.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and mssdate >= '"+getCurrentDateTime().daysSubtracted(60).toString("%Y-%m-%d")+"' group by d.dsid order by d.type,dm desc");
+	query.set("select d.dsid,d.title,d.summary,d.type,max(mssdate) as dm from dssdb.dataset as m left join search.datasets as d on concat('ds',d.dsid) = m.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and mssdate >= '"+dateutils::current_date_time().days_subtracted(60).to_string("%Y-%m-%d")+"' group by d.dsid order by d.type,dm desc");
     }
   }
   else if (local_args.browse_by == "doi") {
@@ -1122,9 +1112,8 @@ void display_cache()
     }
     qstring+="'"+key+"'";
   }
-  metautils::readConfig("lookfordata","","");
-  MySQL::Server server;
-  metautils::connectToMetadataServer(server);
+  metautils::read_config("lookfordata","","");
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::LocalQuery query("select dsid,title,summary,type from search.datasets where dsid in ("+qstring+") order by field(dsid,"+qstring+")");
   if (query.submit(server) == 0) {
     MySQL::Row row;
@@ -1151,15 +1140,14 @@ void display_cache()
 
 void showStart()
 {
-  MySQL::Server server;
   MySQL::Query query;
   MySQL::Row row;
   my::map<CatEntry> cat_table;
   CatEntry ce;
   std::string num_ds;
 
-  metautils::readConfig("lookfordata","","");
-  metautils::connectToMetadataServer(server);
+  metautils::read_config("lookfordata","","");
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   query.set("select count(distinct dsid) from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS);
   if (query.submit(server) == 0) {
     if (query.fetch_row(row)) {
@@ -1272,12 +1260,11 @@ std::string setDateTime(std::string datetime,std::string flag,std::string time_z
 
 void getComparisonDataset(ComparisonEntry& de_ref)
 {
-  metautils::readConfig("lookfordata","","");
-  MySQL::Server server;
-  metautils::connectToMetadataServer(server);
+  metautils::read_config("lookfordata","","");
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::Query query("title,type","search.datasets","dsid = '"+de_ref.key+"'");
   if (query.submit(server) < 0) {
-    webError("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
   }
   MySQL::Row row;
   query.fetch_row(row);
@@ -1285,7 +1272,7 @@ void getComparisonDataset(ComparisonEntry& de_ref)
   de_ref.type=row[1];
   query.set("select min(concat(date_start,' ',time_start)),min(start_flag),max(concat(date_end,' ',time_end)),min(end_flag),any_value(time_zone) from dssdb.dsperiod where dsid = 'ds"+de_ref.key+"' group by dsid");
   if (query.submit(server) < 0) {
-    webError("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
   }
   query.fetch_row(row);
   if (!row.empty()) {
@@ -1298,7 +1285,7 @@ void getComparisonDataset(ComparisonEntry& de_ref)
   de_ref.data_types.clear();
   query.set("select distinct keyword from search.data_types where dsid = '"+de_ref.key+"' order by keyword");
   if (query.submit(server) < 0) {
-    webError("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
     de_ref.data_types.emplace_back(row[0]);
@@ -1306,7 +1293,7 @@ void getComparisonDataset(ComparisonEntry& de_ref)
   de_ref.formats.clear();
   query.set("select distinct keyword from search.formats where dsid = '"+de_ref.key+"' order by keyword");
   if (query.submit(server) < 0) {
-    webError("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
     de_ref.formats.emplace_back(row[0]);
@@ -1314,7 +1301,7 @@ void getComparisonDataset(ComparisonEntry& de_ref)
   de_ref.time_resolution_table.clear();
   query.set("select distinct t.keyword,t.origin,ts.idx from search.time_resolutions as t left join search.time_resolution_sort as ts on t.keyword = ts.keyword where dsid = '"+de_ref.key+"' order by ts.idx");
   if (query.submit(server) < 0) {
-    webError("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
     TimeResolution tr;
@@ -1336,7 +1323,7 @@ void getComparisonDataset(ComparisonEntry& de_ref)
   de_ref.grid_resolutions.clear();
   query.set("select distinct t.keyword,ts.idx from search.grid_resolutions as t left join search.grid_resolution_sort as ts on t.keyword = ts.keyword where dsid = '"+de_ref.key+"' order by ts.idx");
   if (query.submit(server) < 0) {
-    webError("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
     de_ref.grid_resolutions.emplace_back(row[0]);
@@ -1344,7 +1331,7 @@ void getComparisonDataset(ComparisonEntry& de_ref)
   de_ref.projects.clear();
   query.set("select distinct g.last_in_path from search.projects as p left join search.GCMD_projects as g on g.uuid = p.keyword where p.dsid = '"+de_ref.key+"' order by g.last_in_path");
   if (query.submit(server) < 0) {
-    webError("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
     de_ref.projects.emplace_back(row[0]);
@@ -1352,7 +1339,7 @@ void getComparisonDataset(ComparisonEntry& de_ref)
   de_ref.supportedProjects.clear();
   query.set("select distinct g.last_in_path from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword where p.dsid = '"+de_ref.key+"' order by g.last_in_path");
   if (query.submit(server) < 0) {
-    webError("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
     de_ref.supportedProjects.emplace_back(row[0]);
@@ -1360,7 +1347,7 @@ void getComparisonDataset(ComparisonEntry& de_ref)
   de_ref.platforms.clear();
   query.set("select distinct g.last_in_path from search.platforms_new as p left join search.GCMD_platforms as g on g.uuid = p.keyword  where p.dsid = '"+de_ref.key+"' order by g.last_in_path");
   if (query.submit(server) < 0) {
-    webError("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
     de_ref.platforms.emplace_back(row[0]);
@@ -1487,7 +1474,6 @@ void writeGridProducts(GridProducts& gp)
 
 void compare()
 {
-  MySQL::Server server;
   XMLDocument xdoc;
   std::list<XMLElement> elist;
   ComparisonEntry ce1,ce2;
@@ -1500,10 +1486,11 @@ void compare()
   size_t n;
   std::list<std::string>::iterator it;
 
-  metautils::readConfig("lookfordata","","");
-  metautils::connectToMetadataServer(server);
-  if (local_args.compare_list.size() < 2)
-    webError("bad query");
+  metautils::read_config("lookfordata","","");
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
+  if (local_args.compare_list.size() < 2) {
+    web_error("bad query");
+  }
   it=local_args.compare_list.begin();
   ce1.key=*it;
   getComparisonDataset(ce1);
@@ -1667,7 +1654,7 @@ void compare()
 	strutils::replace_all(sdum,"EARTH SCIENCE > ","");
 	array.push_back(sdum);
     }
-    binarySort(array,compareStrings);
+    binary_sort(array,compare_strings);
     for (n=0; n < elist.size(); n++)
 	std::cout << "&bull;&nbsp;"+array[n]+"<br>";
     xdoc.close();
@@ -1681,7 +1668,7 @@ void compare()
 	strutils::replace_all(sdum,"EARTH SCIENCE > ","");
 	array.push_back(sdum);
     }
-    binarySort(array,compareStrings);
+    binary_sort(array,compare_strings);
     for (n=0; n < elist.size(); n++)
 	std::cout << "&bull;&nbsp;"+array[n]+"<br>";
     xdoc.close();
