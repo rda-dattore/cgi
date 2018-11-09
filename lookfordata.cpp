@@ -57,14 +57,14 @@ struct TimeResolution {
   std::shared_ptr<std::string> types;
 };
 struct ComparisonEntry {
-  ComparisonEntry() : key(),title(),summary(),type(),start(),end(),order(0),time_resolution_table(),data_types(),formats(),grid_resolutions(),projects(),supportedProjects(),platforms() {}
+  ComparisonEntry() : key(),title(),summary(),type(),start(),end(),order(0),time_resolution_table(),data_types(),formats(),grid_resolutions(),projects(),supported_projects(),platforms() {}
 
   std::string key;
   std::string title,summary,type;
   std::string start,end;
   size_t order;
   my::map<TimeResolution> time_resolution_table;
-  std::list<std::string> data_types,formats,grid_resolutions,projects,supportedProjects,platforms;
+  std::list<std::string> data_types,formats,grid_resolutions,projects,supported_projects,platforms;
 };
 struct StringEntry {
   StringEntry() : key() {}
@@ -97,7 +97,7 @@ bool compare_strings(std::string& left,std::string& right)
   return (left < right);
 }
 
-bool sortnhourKeys(const std::string& left,const std::string& right)
+bool sort_nhour_keys(const std::string& left,const std::string& right)
 {
   std::string l=left;
   std::string r=right;
@@ -123,7 +123,7 @@ bool sortnhourKeys(const std::string& left,const std::string& right)
   }
 }
 
-extern "C" void *summarizeGridProducts(void *gpstruct)
+extern "C" void *thread_summarize_grid_products(void *gpstruct)
 {
   MySQL::Query query;
   MySQL::Row row;
@@ -210,18 +210,18 @@ extern "C" void *summarizeGridProducts(void *gpstruct)
     }
   }
   tserver.disconnect();
-  g->tables.forecast.keysort(sortnhourKeys);
-  g->tables.average.keysort(sortnhourKeys);
-  g->tables.accumulation.keysort(sortnhourKeys);
-  g->tables.weekly_mean.keysort(sortnhourKeys);
-  g->tables.monthly_mean.keysort(sortnhourKeys);
-  g->tables.monthly_var_covar.keysort(sortnhourKeys);
-  g->tables.mean.keysort(sortnhourKeys);
-  g->tables.var_covar.keysort(sortnhourKeys);
+  g->tables.forecast.keysort(sort_nhour_keys);
+  g->tables.average.keysort(sort_nhour_keys);
+  g->tables.accumulation.keysort(sort_nhour_keys);
+  g->tables.weekly_mean.keysort(sort_nhour_keys);
+  g->tables.monthly_mean.keysort(sort_nhour_keys);
+  g->tables.monthly_var_covar.keysort(sort_nhour_keys);
+  g->tables.mean.keysort(sort_nhour_keys);
+  g->tables.var_covar.keysort(sort_nhour_keys);
   return NULL;
 }
 
-extern "C" void *summarizeGridCoverages(void *gcstruct)
+extern "C" void *thread_summarize_grid_coverages(void *gcstruct)
 {
   GridCoverages *g=(GridCoverages *)gcstruct;
   MySQL::Server tserver(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
@@ -235,7 +235,7 @@ extern "C" void *summarizeGridCoverages(void *gcstruct)
   return NULL;
 }
 
-std::string getCategory(std::string short_name)
+std::string category(std::string short_name)
 {
   std::string long_name;
 
@@ -287,7 +287,7 @@ std::string getCategory(std::string short_name)
   else if (short_name == "all") {
     long_name="All RDA Datasets";
   }
-  if (long_name.length() > 0) {
+  if (!long_name.empty()) {
     return long_name;
   }
   else {
@@ -329,7 +329,7 @@ void read_cache()
 	++num_lines;
 	if (line[0] == '@') {
 	  sp=strutils::split(line,"<!>");
-	  if (rmatch.length() > 0) {
+	  if (!rmatch.empty()) {
 	    if (sp[0] == rmatch) {
 		++n;
 		if (n == nmatch) {
@@ -337,7 +337,7 @@ void read_cache()
 		}
 	    }
 	  }
-	  else if (bmatch.length() > 0) {
+	  else if (!bmatch.empty()) {
 	    if (std::regex_search(line,std::regex("^"+bmatch))) {
 		break;
 	    }
@@ -377,53 +377,53 @@ void read_cache()
   }
 }
 
-void parseQuery()
+void parse_query()
 {
-  QueryString queryString(QueryString::GET);
+  QueryString query_string(QueryString::GET);
   std::string sdum;
 
-  if (!queryString) {
+  if (!query_string) {
     std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
   }
-  sdum=queryString.value("nb");
+  sdum=query_string.value("nb");
   if (sdum == "y") {
     local_args.new_browse=true;
   }
-  sdum=queryString.value("dc");
+  sdum=query_string.value("dc");
   if (sdum == "y") {
     local_args.display_cache=true;
   }
-  local_args.refine_by=queryString.value("r");
-  local_args.browse_by_list=queryString.values("b");
+  local_args.refine_by=query_string.value("r");
+  local_args.browse_by_list=query_string.values("b");
   if (local_args.browse_by_list.size() < 2) {
-    local_args.browse_by=queryString.value("b");
+    local_args.browse_by=query_string.value("b");
   }
-  local_args.browse_value_list=queryString.values("v");
+  local_args.browse_value_list=query_string.values("v");
   if (local_args.browse_value_list.size() < 2) {
-    local_args.browse_value=queryString.value("v");
+    local_args.browse_value=query_string.value("v");
   }
-  local_args.origin=queryString.value("o");
+  local_args.origin=query_string.value("o");
   if (local_args.browse_by_list.size() != local_args.browse_value_list.size()) {
     std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
   }
   if (local_args.browse_by_list.size() > 1) {
     local_args.new_browse=true;
   }
-  local_args.from_home_page=queryString.value("hp");
-  local_args.refine_color=queryString.value("rc");
-  if (local_args.refine_color.length() == 0) {
+  local_args.from_home_page=query_string.value("hp");
+  local_args.refine_color=query_string.value("rc");
+  if (local_args.refine_color.empty()) {
     local_args.refine_color="#eafaff";
   }
   if (local_args.browse_by == "type") {
     local_args.browse_value=strutils::substitute(strutils::to_lower(local_args.browse_value)," ","_");
   }
   local_args.lkey=value_from_cookie("lkey");
-  local_args.compare_list=queryString.values("cmp");
+  local_args.compare_list=query_string.values("cmp");
   if (!local_args.new_browse) {
     read_cache();
   }
   else {
-    if (local_args.lkey.length() > 0) {
+    if (!local_args.lkey.empty()) {
 	system(("rm -f "+server_root+"/tmp/browse."+local_args.lkey).c_str());
     }
     local_args.lkey=strutils::strand(30);
@@ -431,7 +431,7 @@ void parseQuery()
   }
 }
 
-void parseRefineQuery(MySQL::Query& query)
+void parse_refine_query(MySQL::Query& query)
 {
   metautils::read_config("lookfordata","","");
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
@@ -454,7 +454,7 @@ void parseRefineQuery(MySQL::Query& query)
 	}
 	if (add_to_list) {
 	  CountEntry ce;
-	  if (row[0].length() == 0) {
+	  if (row[0].empty()) {
 	    ce.key="Not specified";
 	  }
 	  else if (local_args.refine_by == "loc") {
@@ -495,7 +495,7 @@ void parseRefineQuery(MySQL::Query& query)
   std::cout << "Content-type: text/html" << std::endl << std::endl;
   std::cout << "<div style=\"background-color: #27aae0\">";
   if (local_args.from_home_page != "yes") {
-    std::cout << "<div style=\"font-size: 16px; font-weight: bold; padding: 2px; text-align: center; width: auto; height: 20px; line-height: 20px\">" << getCategory(local_args.refine_by) << "</div>";
+    std::cout << "<div style=\"font-size: 16px; font-weight: bold; padding: 2px; text-align: center; width: auto; height: 20px; line-height: 20px\">" << category(local_args.refine_by) << "</div>";
   }
   if (keyword_count_table.size() > 0) {
     if (local_args.refine_by.substr(1) != "res") {
@@ -572,7 +572,7 @@ void parseRefineQuery(MySQL::Query& query)
   server.disconnect();
 }
 
-void showRefineResults()
+void show_refine_results()
 {
   MySQL::Query query;
   if (local_args.refine_by == "var") {
@@ -678,14 +678,14 @@ void showRefineResults()
   }
 //std::cerr << query.show() << std::endl;
   if (query) {
-    parseRefineQuery(query);
+    parse_refine_query(query);
   }
   else {
     std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
   }
 }
 
-void openCacheForWriting()
+void open_cache_for_writing()
 {
   if (local_args.new_browse) {
     cache.open((server_root+"/tmp/browse."+local_args.lkey).c_str());
@@ -695,7 +695,7 @@ void openCacheForWriting()
   }
 }
 
-void closeCache()
+void close_cache()
 {
   cache.close();
 }
@@ -735,8 +735,8 @@ void add_breadcrumbs(size_t num_results)
     else {
 	++(*ce.count);
     }
-    std::cout << "-" << *ce.count << "','')\"><nobr>" << getCategory(kparts[0]) << "</nobr></a> : " << bval << " <span class=\"mediumGrayText\">(" << *bce.count << ")</span>";
-    breadcrumbs+="-"+strutils::itos(*ce.count)+"\\',\\'\\')&quot;><nobr>"+getCategory(kparts[0])+"</nobr></a> : "+bval+" <span class=&quot;mediumGrayText&quot;>("+*bce.count+")</span>";
+    std::cout << "-" << *ce.count << "','')\"><nobr>" << category(kparts[0]) << "</nobr></a> : " << bval << " <span class=\"mediumGrayText\">(" << *bce.count << ")</span>";
+    breadcrumbs+="-"+strutils::itos(*ce.count)+"\\',\\'\\')&quot;><nobr>"+category(kparts[0])+"</nobr></a> : "+bval+" <span class=&quot;mediumGrayText&quot;>("+*bce.count+")</span>";
     ++n;
   }
   if (n > 0) {
@@ -752,7 +752,7 @@ void add_breadcrumbs(size_t num_results)
   else {
     ++(*ce.count);
   }
-  std::cout << "-" << *ce.count << "','')\"><nobr>" << getCategory(local_args.browse_by) << "</nobr></a> : ";
+  std::cout << "-" << *ce.count << "','')\"><nobr>" << category(local_args.browse_by) << "</nobr></a> : ";
   if (local_args.browse_by == "var" || local_args.browse_by == "type") {
     std::cout << strutils::capitalize(local_args.browse_value);
   }
@@ -790,7 +790,7 @@ void add_breadcrumbs(size_t num_results)
   }
 }
 
-void showDatasetsAfterProcessing(MySQL::LocalQuery& query,int num_entries,bool display_results)
+void show_datasets_after_processing(MySQL::LocalQuery& query,int num_entries,bool display_results)
 {
   MySQL::Row row;
   std::string sdum;
@@ -819,7 +819,7 @@ void showDatasetsAfterProcessing(MySQL::LocalQuery& query,int num_entries,bool d
 	}
     }
   }
-  openCacheForWriting();
+  open_cache_for_writing();
   cache << "@" << local_args.browse_by << "<!>" << local_args.browse_value << "<!>" << num_results << std::endl;
   if (display_results) {
     std::cout << "Content-type: text/html" << std::endl << std::endl;
@@ -831,7 +831,7 @@ void showDatasetsAfterProcessing(MySQL::LocalQuery& query,int num_entries,bool d
   while (query.fetch_row(row)) {
     ce.key="";
     if (prev_results_table.found(row[0],dse) && (num_entries < 2 || (multi_table.found(row[0],ce) && (*ce.count) == static_cast<int>(num_entries)))) {
-	if (ce.key.length() > 0) {
+	if (!ce.key.empty()) {
 	  (*ce.count)=0;
 	}
 	cache << row[0] << std::endl;
@@ -851,21 +851,21 @@ void showDatasetsAfterProcessing(MySQL::LocalQuery& query,int num_entries,bool d
 	}
     }
   }
-  closeCache();
+  close_cache();
   if (display_results) {
     std::cout << "</form>" << std::endl;
     std::cout << "</body></html>" << std::endl;
   }
 }
 
-void showDatasetsFromQuery(MySQL::LocalQuery& query,bool display_results)
+void show_datasets_from_query(MySQL::LocalQuery& query,bool display_results)
 {
   MySQL::Row row;
   std::string sdum;
   int n=0;
   size_t iterator;
 
-  openCacheForWriting();
+  open_cache_for_writing();
   cache << "@" << local_args.browse_by << "<!>" << local_args.browse_value << "<!>" << query.num_rows() << std::endl;
   if (display_results) {
     std::cout << "Content-type: text/html" << std::endl << std::endl;
@@ -893,10 +893,10 @@ void showDatasetsFromQuery(MySQL::LocalQuery& query,bool display_results)
   if (display_results) {
     std::cout << "</form>" << std::endl;
   }
-  closeCache();
+  close_cache();
 }
 
-void parseBrowseQuery(MySQL::LocalQuery& query,int num_entries,bool display_results)
+void parse_browse_query(MySQL::LocalQuery& query,int num_entries,bool display_results)
 {
   bgcolors[0]="#ffffff";
   bgcolors[1]="#f8fcff";
@@ -904,10 +904,10 @@ void parseBrowseQuery(MySQL::LocalQuery& query,int num_entries,bool display_resu
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (query.submit(server) == 0) {
     if (prev_results_table.size() > 0) {
-	showDatasetsAfterProcessing(query,num_entries,display_results);
+	show_datasets_after_processing(query,num_entries,display_results);
     }
     else {
-	showDatasetsFromQuery(query,display_results);
+	show_datasets_from_query(query,display_results);
     }
   }
   else {
@@ -983,7 +983,7 @@ void browse(bool display_results = true)
     }
     else {
 	std::string qspec="select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = '"+local_args.browse_value+"' or g.path like '% > "+local_args.browse_value+"')";
-	if (local_args.origin.length() > 0) {
+	if (!local_args.origin.empty()) {
 	  qspec+=" and p.origin = '"+local_args.origin+"'";
 	}
 	qspec+=" group by d.dsid order by d.type,trank";
@@ -1028,7 +1028,7 @@ void browse(bool display_results = true)
     sp=strutils::split(local_args.browse_value);
     for (n=0; n < sp.size(); ++n) {
 	if (sp[n].front() == '-') {
-	  if (exclude_words.length() > 0) {
+	  if (!exclude_words.empty()) {
 	    exclude_words+=" or ";
 	  }
 	  exclude_words+="word = '"+sp[n].substr(1)+"'";
@@ -1036,16 +1036,16 @@ void browse(bool display_results = true)
 	else {
 	  sdum=sp[n];
 	  sword=searchutils::cleaned_search_word(sdum,ignore);
-	  if (include_words.length() > 0) {
+	  if (!include_words.empty()) {
 	    include_words+=" or ";
 	  }
 	  include_words+="word = '"+sdum+"' or (word like '"+sword+"' and sword = '"+strutils::soundex(sword)+"')";
 	  num_entries++;
 	}
     }
-    if (include_words.length() > 0 && exclude_words.length() > 0) {
+    if (!include_words.empty() && !exclude_words.empty()) {
     }
-    else if (include_words.length() > 0) {
+    else if (!include_words.empty()) {
 	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank,word from (select dsid,word from search.title_wordlist where "+include_words+" union select dsid,word from search.summary_wordlist where "+include_words+") as u left join search.datasets as d on d.dsid = u.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" group by d.dsid,word order by d.type,trank");
     }
     else {
@@ -1077,7 +1077,7 @@ void browse(bool display_results = true)
     }
   }
   if (query) {
-    parseBrowseQuery(query,num_entries,display_results);
+    parse_browse_query(query,num_entries,display_results);
   }
   else {
     std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
@@ -1137,7 +1137,7 @@ void display_cache()
   server.disconnect();
 }
 
-void showStart()
+void show_start()
 {
   MySQL::Query query;
   MySQL::Row row;
@@ -1225,7 +1225,7 @@ void showStart()
   server.disconnect();
 }
 
-std::string setDateTime(std::string datetime,std::string flag,std::string time_zone)
+std::string set_date_time(std::string datetime,std::string flag,std::string time_zone)
 {
   std::string dt;
   size_t n;
@@ -1257,13 +1257,13 @@ std::string setDateTime(std::string datetime,std::string flag,std::string time_z
   return dt;
 }
 
-void getComparisonDataset(ComparisonEntry& de_ref)
+void fill_comparison_dataset(ComparisonEntry& de_ref)
 {
   metautils::read_config("lookfordata","","");
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::Query query("title,type","search.datasets","dsid = '"+de_ref.key+"'");
   if (query.submit(server) < 0) {
-    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("fill_comparison_dataset():\n"+query.error()+"\n"+query.show());
   }
   MySQL::Row row;
   query.fetch_row(row);
@@ -1271,20 +1271,20 @@ void getComparisonDataset(ComparisonEntry& de_ref)
   de_ref.type=row[1];
   query.set("select min(concat(date_start,' ',time_start)),min(start_flag),max(concat(date_end,' ',time_end)),min(end_flag),any_value(time_zone) from dssdb.dsperiod where dsid = 'ds"+de_ref.key+"' group by dsid");
   if (query.submit(server) < 0) {
-    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("fill_comparison_dataset():\n"+query.error()+"\n"+query.show());
   }
   query.fetch_row(row);
   if (!row.empty()) {
-    de_ref.start=setDateTime(row[0],row[1],row[4]);
-    de_ref.end=setDateTime(row[2],row[3],row[4]);
+    de_ref.start=set_date_time(row[0],row[1],row[4]);
+    de_ref.end=set_date_time(row[2],row[3],row[4]);
   }
   else {
-    de_ref.start=setDateTime("9998","1","");
+    de_ref.start=set_date_time("9998","1","");
   }
   de_ref.data_types.clear();
   query.set("select distinct keyword from search.data_types where dsid = '"+de_ref.key+"' order by keyword");
   if (query.submit(server) < 0) {
-    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("fill_comparison_dataset():\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
     de_ref.data_types.emplace_back(row[0]);
@@ -1292,7 +1292,7 @@ void getComparisonDataset(ComparisonEntry& de_ref)
   de_ref.formats.clear();
   query.set("select distinct keyword from search.formats where dsid = '"+de_ref.key+"' order by keyword");
   if (query.submit(server) < 0) {
-    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("fill_comparison_dataset():\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
     de_ref.formats.emplace_back(row[0]);
@@ -1300,7 +1300,7 @@ void getComparisonDataset(ComparisonEntry& de_ref)
   de_ref.time_resolution_table.clear();
   query.set("select distinct t.keyword,t.origin,ts.idx from search.time_resolutions as t left join search.time_resolution_sort as ts on t.keyword = ts.keyword where dsid = '"+de_ref.key+"' order by ts.idx");
   if (query.submit(server) < 0) {
-    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("fill_comparison_dataset():\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
     TimeResolution tr;
@@ -1322,7 +1322,7 @@ void getComparisonDataset(ComparisonEntry& de_ref)
   de_ref.grid_resolutions.clear();
   query.set("select distinct t.keyword,ts.idx from search.grid_resolutions as t left join search.grid_resolution_sort as ts on t.keyword = ts.keyword where dsid = '"+de_ref.key+"' order by ts.idx");
   if (query.submit(server) < 0) {
-    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("fill_comparison_dataset():\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
     de_ref.grid_resolutions.emplace_back(row[0]);
@@ -1330,30 +1330,30 @@ void getComparisonDataset(ComparisonEntry& de_ref)
   de_ref.projects.clear();
   query.set("select distinct g.last_in_path from search.projects as p left join search.GCMD_projects as g on g.uuid = p.keyword where p.dsid = '"+de_ref.key+"' order by g.last_in_path");
   if (query.submit(server) < 0) {
-    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("fill_comparison_dataset():\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
     de_ref.projects.emplace_back(row[0]);
   }
-  de_ref.supportedProjects.clear();
+  de_ref.supported_projects.clear();
   query.set("select distinct g.last_in_path from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword where p.dsid = '"+de_ref.key+"' order by g.last_in_path");
   if (query.submit(server) < 0) {
-    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("fill_comparison_dataset():\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
-    de_ref.supportedProjects.emplace_back(row[0]);
+    de_ref.supported_projects.emplace_back(row[0]);
   }
   de_ref.platforms.clear();
   query.set("select distinct g.last_in_path from search.platforms_new as p left join search.GCMD_platforms as g on g.uuid = p.keyword  where p.dsid = '"+de_ref.key+"' order by g.last_in_path");
   if (query.submit(server) < 0) {
-    web_error("getComparisonDataset:\n"+query.error()+"\n"+query.show());
+    web_error("fill_comparison_dataset():\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
     de_ref.platforms.emplace_back(row[0]);
   }
 }
 
-void writeKeys(const std::list<std::string>& keys)
+void write_keys(const std::list<std::string>& keys)
 {
   bool started;
 
@@ -1367,7 +1367,7 @@ void writeKeys(const std::list<std::string>& keys)
   }
 }
 
-void writeGridProducts(GridProducts& gp)
+void write_gridded_products(GridProducts& gp)
 {
   size_t num=0;
 
@@ -1409,7 +1409,7 @@ void writeGridProducts(GridProducts& gp)
 	std::cout << "&bull;&nbsp;";
     }
     std::cout << "Forecasts <small class=\"mediumGrayText\">(";
-    writeKeys(gp.tables.forecast.keys());
+    write_keys(gp.tables.forecast.keys());
     std::cout << ")</small><br>";
   }
   if (gp.tables.average.size() > 0) {
@@ -1417,7 +1417,7 @@ void writeGridProducts(GridProducts& gp)
 	std::cout << "&bull;&nbsp;";
     }
     std::cout << "Averages <small class=\"mediumGrayText\">(";
-    writeKeys(gp.tables.average.keys());
+    write_keys(gp.tables.average.keys());
     std::cout << ")</small><br>";
   }
   if (gp.tables.accumulation.size() > 0) {
@@ -1425,7 +1425,7 @@ void writeGridProducts(GridProducts& gp)
 	std::cout << "&bull;&nbsp;";
     }
     std::cout << "Accumulations <small class=\"mediumGrayText\">(";
-    writeKeys(gp.tables.accumulation.keys());
+    write_keys(gp.tables.accumulation.keys());
     std::cout << ")</small><br>";
   }
   if (gp.tables.weekly_mean.size() > 0) {
@@ -1433,7 +1433,7 @@ void writeGridProducts(GridProducts& gp)
 	std::cout << "&bull;&nbsp;";
     }
     std::cout << "Weekly Means <small class=\"mediumGrayText\">(";
-    writeKeys(gp.tables.weekly_mean.keys());
+    write_keys(gp.tables.weekly_mean.keys());
     std::cout << ")</small><br>";
   }
   if (gp.tables.monthly_mean.size() > 0) {
@@ -1442,7 +1442,7 @@ void writeGridProducts(GridProducts& gp)
     }
     std::cout << "Monthly Means <small class=\"mediumGrayText\">";
     std::cout << "(";
-    writeKeys(gp.tables.monthly_mean.keys());
+    write_keys(gp.tables.monthly_mean.keys());
     std::cout << ")</small><br>";
   }
   if (gp.tables.monthly_var_covar.size() > 0) {
@@ -1450,7 +1450,7 @@ void writeGridProducts(GridProducts& gp)
 	std::cout << "&bull;&nbsp;";
     }
     std::cout << "Monthly Variances/Covariances <small class=\"mediumGrayText\">(";
-    writeKeys(gp.tables.monthly_var_covar.keys());
+    write_keys(gp.tables.monthly_var_covar.keys());
     std::cout << ")</small><br>";
   }
   if (gp.tables.mean.size() > 0) {
@@ -1458,7 +1458,7 @@ void writeGridProducts(GridProducts& gp)
 	std::cout << "&bull;&nbsp;";
     }
     std::cout << "Means <small class=\"mediumGrayText\">(";
-    writeKeys(gp.tables.mean.keys());
+    write_keys(gp.tables.mean.keys());
     std::cout << ")</small><br>";
   }
   if (gp.tables.var_covar.size() > 0) {
@@ -1466,7 +1466,7 @@ void writeGridProducts(GridProducts& gp)
 	std::cout << "&bull;&nbsp;";
     }
     std::cout << "Variances/Covariances <small class=\"mediumGrayText\">(";
-    writeKeys(gp.tables.var_covar.keys());
+    write_keys(gp.tables.var_covar.keys());
     std::cout << ")</small><br>";
   }
 }
@@ -1492,10 +1492,10 @@ void compare()
   }
   it=local_args.compare_list.begin();
   ce1.key=*it;
-  getComparisonDataset(ce1);
+  fill_comparison_dataset(ce1);
   ++it;
   ce2.key=*it;
-  getComparisonDataset(ce2);
+  fill_comparison_dataset(ce2);
   std::cout << "Content-type: text/html" << std::endl << std::endl;
   std::cout << "<style id=\"compare\">" << std::endl;
   std::cout << "table.compare th," << std::endl;
@@ -1604,26 +1604,26 @@ void compare()
   table2="GrML.ds"+dsnum2+"_grids";
   if (table_exists(server,table1) || table_exists(server,table2)) {
     gp1.table=table1;
-    pthread_create(&gp1.tid,NULL,summarizeGridProducts,reinterpret_cast<void *>(&gp1));
+    pthread_create(&gp1.tid,NULL,thread_summarize_grid_products,reinterpret_cast<void *>(&gp1));
     gp2.table=table2;
-    pthread_create(&gp2.tid,NULL,summarizeGridProducts,reinterpret_cast<void *>(&gp2));
+    pthread_create(&gp2.tid,NULL,thread_summarize_grid_products,reinterpret_cast<void *>(&gp2));
     gc1.table="GrML.summary";
     gc1.dsnum=ce1.key;
-    pthread_create(&gc1.tid,NULL,summarizeGridCoverages,reinterpret_cast<void *>(&gc1));
+    pthread_create(&gc1.tid,NULL,thread_summarize_grid_coverages,reinterpret_cast<void *>(&gc1));
     gc2.table="GrML.summary";
     gc2.dsnum=ce2.key;
-    pthread_create(&gc2.tid,NULL,summarizeGridCoverages,reinterpret_cast<void *>(&gc2));
+    pthread_create(&gc2.tid,NULL,thread_summarize_grid_coverages,reinterpret_cast<void *>(&gc2));
     pthread_join(gp1.tid,NULL);
     pthread_join(gp2.tid,NULL);
     pthread_join(gc1.tid,NULL);
     pthread_join(gc2.tid,NULL);
     std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Gridded Products</th><td class=\"bg0\" align=\"left\">";
     if (table_exists(server,table1)) {
-      writeGridProducts(gp1);
+      write_gridded_products(gp1);
     }
     std::cout << "</td><td class=\"bg0\" align=\"left\">";
     if (table_exists(server,table2)) {
-      writeGridProducts(gp2);
+      write_gridded_products(gp2);
     }
     std::cout << "</td></tr>" << std::endl;
     std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Grid Resolution and Coverage</th><td class=\"bg0\" align=\"left\">";
@@ -1653,7 +1653,7 @@ void compare()
     for (auto e : elist) {
 	sdum=e.content();
 	strutils::replace_all(sdum,"EARTH SCIENCE > ","");
-	array.push_back(sdum);
+	array.emplace_back(sdum);
     }
     binary_sort(array,compare_strings);
     for (n=0; n < elist.size(); n++)
@@ -1667,7 +1667,7 @@ void compare()
     for (auto e : elist) {
 	sdum=e.content();
 	strutils::replace_all(sdum,"EARTH SCIENCE > ","");
-	array.push_back(sdum);
+	array.emplace_back(sdum);
     }
     binary_sort(array,compare_strings);
     for (n=0; n < elist.size(); n++)
@@ -1703,15 +1703,15 @@ void compare()
 
 int main(int argc,char **argv)
 {
-  parseQuery();
+  parse_query();
   if (local_args.display_cache) {
     display_cache();
   }
   else if (local_args.compare_list.size() > 0) {
     compare();
   }
-  else if (local_args.refine_by.length() > 0) {
-    showRefineResults();
+  else if (!local_args.refine_by.empty()) {
+    show_refine_results();
   }
   else if (local_args.browse_by_list.size() > 0) {
     if (local_args.browse_by_list.size() != local_args.browse_value_list.size()) {
@@ -1737,14 +1737,14 @@ int main(int argc,char **argv)
 	}
     }
   }
-  else if (local_args.browse_by.length() > 0) {
+  else if (!local_args.browse_by.empty()) {
     if (local_args.browse_by == "type") {
 	local_args.browse_value=strutils::substitute(strutils::to_lower(local_args.browse_value)," ","_");
     }
     browse();
   }
   else if (local_args.new_browse) {
-    showStart();
+    show_start();
   }
   else {
     std::cout << "Location: /index.html?hash=error&code=404" << std::endl << std::endl;
