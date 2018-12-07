@@ -14,12 +14,14 @@
 #include <bits.hpp>
 #include <datetime.hpp>
 #include <grid.hpp>
+#include <gridutils.hpp>
 
 struct ConfigData {
-  ConfigData() : version(),db_host(),db_username(),db_password() {}
+  ConfigData() : version(),db_host(),db_username(),db_password(),rdadata_home() {}
 
   std::string version;
   std::string db_host,db_username,db_password;
+  std::string rdadata_home;
 } config_data;
 struct StringEntry {
   StringEntry() : key() {}
@@ -59,7 +61,7 @@ struct DapArgs {
     } lon_index;
   } grid_definition;
 } dap_args;
-gridSubset::Args grid_subset_args;
+gridutils::gridSubset::Args grid_subset_args;
 MySQL::Server server;
 struct Dimension {
   Dimension() : length(0),start(0.),stop(0.),increment(0.) {}
@@ -101,18 +103,18 @@ std::string myerror="";
 std::string mywarning="";
 struct timespec tp;
 
-void printDateAndVersion(std::ostream& outs)
+void print_date_and_version(std::ostream& outs)
 {
-  outs << "Date: " << getCurrentDateTime().toString("%a, %d %h %Y %H:%MM:%SS GMT") << std::endl;
+  outs << "Date: " << dateutils::current_date_time().to_string("%a, %d %h %Y %H:%MM:%SS GMT") << std::endl;
   outs << "XDODS-Server: " << config_data.version << std::endl;
 }
 
-void dapError(std::string status,std::string message)
+void dap_error(std::string status,std::string message)
 {
   std::cout << "Status: " << status << std::endl;
   std::cout << "Content-type: text/plain" << std::endl;
   std::cout << "Content-Description: dods-error" << std::endl;
-  printDateAndVersion(std::cout);
+  print_date_and_version(std::cout);
   std::cout << std::endl;
   std::cout << "Error {" << std::endl;
   std::cout << "  code = " << status.substr(0,status.find(" ")) << ";" << std::endl;
@@ -126,7 +128,7 @@ void parse_config()
 {
   std::ifstream ifs("/usr/local/www/server_root/web/cgi-bin/internal/conf/opendap.conf");
   if (!ifs.is_open()) {
-    dapError("500 Internal Server Error","Missing configuration");
+    dap_error("500 Internal Server Error","Missing configuration");
   }
   auto line=new char[4096];
   ifs.getline(line,4096);
@@ -147,15 +149,18 @@ void parse_config()
 	else if (nvp.front() == "db_password") {
 	  config_data.db_password=nvp.back();
 	}
+	else if (nvp.front() == "rdadata_home") {
+	  config_data.rdadata_home=nvp.back();
+	}
     }
     ifs.getline(line,4096);
   }
   ifs.close();
 }
 
-void decodeRequestData()
+void decode_request_data()
 {
-  decodeGridSubsetString(dap_args.rinfo,grid_subset_args);
+  decode_grid_subset_string(dap_args.rinfo,grid_subset_args);
   dap_args.dsnum=grid_subset_args.dsnum;
   dap_args.dsnum2=strutils::substitute(dap_args.dsnum,".","");
   strutils::replace_all(grid_subset_args.startdate,"-","");
@@ -165,37 +170,37 @@ void decodeRequestData()
   strutils::replace_all(grid_subset_args.enddate,":","");
   strutils::replace_all(grid_subset_args.enddate," ","");
   if (grid_subset_args.parameters.size() == 0) {
-    dapError("500 Internal Server Error","Bad aggregation specification (1)");
+    dap_error("500 Internal Server Error","Bad aggregation specification (1)");
   }
   for (const auto& key : grid_subset_args.parameters.keys()) {
-    gridSubset::Parameter param;
+    gridutils::gridSubset::Parameter param;
     grid_subset_args.parameters.found(key,param);
     if (param.format_code != nullptr) {
 	MySQL::LocalQuery query("select format from WGrML.formats where code = "+*param.format_code);
 	MySQL::Row row;
 	if (query.submit(server) == 0 && query.fetch_row(row)) {
 	  ParameterData pdata;
-	  xmlutils::ParameterMapper parameter_mapper;
-	  pdata.key=strutils::substitute(parameter_mapper.getShortName(row[0],key)," ","_");
+	  xmlutils::ParameterMapper parameter_mapper(config_data.rdadata_home+"/share/metadata/ParameterTables");
+	  pdata.key=strutils::substitute(parameter_mapper.short_name(row[0],key)," ","_");
 	  if (!dap_args.parameters.found(pdata.key,pdata)) {
 	    pdata.data.reset(new ParameterData::Data);
 	    dap_args.parameters.insert(pdata);
 	    pdata.data->format=row[0];
-	    pdata.data->long_name=parameter_mapper.getDescription(row[0],key);
-	    pdata.data->units=parameter_mapper.getUnits(row[0],key);
+	    pdata.data->long_name=parameter_mapper.description(row[0],key);
+	    pdata.data->units=parameter_mapper.units(row[0],key);
 	  }
 	  pdata.data->codes.emplace_back(key);
 	  pdata.data->format_codes.emplace_back(*param.format_code);
 	}
     }
     else {
-	dapError("500 Internal Server Error","Bad aggregation specification (2)");
+	dap_error("500 Internal Server Error","Bad aggregation specification (2)");
     }
   }
   dap_args.grid_definition.code=grid_subset_args.grid_definition_code;
 }
 
-void writeRefTimes(std::ostream& outs,const ProjectionEntry& pe,int ref_time_index)
+void write_reference_times(std::ostream& outs,const ProjectionEntry& pe,int ref_time_index)
 {
   DateTime base_dt;
   MySQL::LocalQuery query("base_time","metautil.custom_dap_ref_times","ID = '"+dap_args.ID+"' and dim_name = '"+pe.key+"'");
@@ -218,21 +223,21 @@ void writeRefTimes(std::ostream& outs,const ProjectionEntry& pe,int ref_time_ind
   if (query.submit(server) == 0) {
     char buf[4];
     if (ref_time_index < 0) {
-	setBits(buf,query.num_rows(),0,32);
+	bits::set(buf,query.num_rows(),0,32);
     }
     else {
-	setBits(buf,pe.data->idx[ref_time_index].length,0,32);
+	bits::set(buf,pe.data->idx[ref_time_index].length,0,32);
     }
     outs.write(buf,4);
     outs.write(buf,4);
     while (query.fetch_row(row)) {
-	setBits(buf,DateTime(std::stoll(row[0])*100).getMinutesSince(base_dt),0,32);
+	bits::set(buf,DateTime(std::stoll(row[0])*100).minutes_since(base_dt),0,32);
 	outs.write(buf,4);
     }
   }
 }
 
-void writeTimes(std::ostream& outs,const ProjectionEntry& pe,int time_index)
+void write_times(std::ostream& outs,const ProjectionEntry& pe,int time_index)
 {
   DateTime base_dt(std::stoll(grid_subset_args.startdate)*100);
   std::string query_spec="select distinct valid_date from metautil.custom_dap_grid_index where ID = '"+dap_args.ID+"'";
@@ -254,10 +259,10 @@ void writeTimes(std::ostream& outs,const ProjectionEntry& pe,int time_index)
     else {
 	char buf[4];
 	if (time_index < 0) {
-	  setBits(buf,query.num_rows(),0,32);
+	  bits::set(buf,query.num_rows(),0,32);
 	}
 	else {
-	  setBits(buf,pe.data->idx[time_index].length,0,32);
+	  bits::set(buf,pe.data->idx[time_index].length,0,32);
 	}
 	outs.write(buf,4);
 	outs.write(buf,4);
@@ -269,11 +274,11 @@ void writeTimes(std::ostream& outs,const ProjectionEntry& pe,int time_index)
 	  if (cnt > 0) {
 	    outs << ", ";
 	  }
-	  outs << DateTime(std::stoll(row[0])*100).getMinutesSince(base_dt);
+	  outs << DateTime(std::stoll(row[0])*100).minutes_since(base_dt);
 	}
 	else {
 	  char buf[4];
-	  setBits(buf,DateTime(std::stoll(row[0])*100).getMinutesSince(base_dt),0,32);
+	  bits::set(buf,DateTime(std::stoll(row[0])*100).minutes_since(base_dt),0,32);
 	  outs.write(buf,4);
 	}
 	++cnt;
@@ -284,7 +289,7 @@ void writeTimes(std::ostream& outs,const ProjectionEntry& pe,int time_index)
   }
 }
 
-void writeFcstHrs(std::ostream& outs,const ProjectionEntry& pe,int fcst_hr_index)
+void write_forecast_hours(std::ostream& outs,const ProjectionEntry& pe,int fcst_hr_index)
 {
   MySQL::LocalQuery query;
   MySQL::Row row;
@@ -303,21 +308,21 @@ void writeFcstHrs(std::ostream& outs,const ProjectionEntry& pe,int fcst_hr_index
   if (query.submit(server) == 0) {
     char buf[4];
     if (fcst_hr_index < 0) {
-	setBits(buf,query.num_rows(),0,32);
+	bits::set(buf,query.num_rows(),0,32);
     }
     else {
-	setBits(buf,pe.data->idx[fcst_hr_index].length,0,32);
+	bits::set(buf,pe.data->idx[fcst_hr_index].length,0,32);
     }
     outs.write(buf,4);
     outs.write(buf,4);
     while (query.fetch_row(row)) {
-	setBits(buf,std::stoi(row[0]),0,32);
+	bits::set(buf,std::stoi(row[0]),0,32);
 	outs.write(buf,4);
     }
   }
 }
 
-void writeLevels(std::ostream& outs,const ProjectionEntry& pe,int lev_index)
+void write_levels(std::ostream& outs,const ProjectionEntry& pe,int lev_index)
 {
   std::string query_spec="select l.value from metautil.custom_dap_level_index as i left join metautil.custom_dap_levels as v on v.ID = i.ID and v.uID = i.uID left join WGrML.levels as l on l.code = i.level_code where i.ID = '"+dap_args.ID+"'";
   if (lev_index >= 0) {
@@ -334,7 +339,7 @@ void writeLevels(std::ostream& outs,const ProjectionEntry& pe,int lev_index)
     }
     else {
 	char buf[4];
-	setBits(buf,query.num_rows(),0,32);
+	bits::set(buf,query.num_rows(),0,32);
 	outs.write(buf,4);
 	outs.write(buf,4);
     }
@@ -357,7 +362,7 @@ void writeLevels(std::ostream& outs,const ProjectionEntry& pe,int lev_index)
 	}
 	else {
 	  char buf[4];
-	  setBits(buf,value.i,0,32);
+	  bits::set(buf,value.i,0,32);
 	  outs.write(buf,4);
 	}
 	++cnt;
@@ -368,18 +373,18 @@ void writeLevels(std::ostream& outs,const ProjectionEntry& pe,int lev_index)
   }
 }
 
-void decodeGridDefinition()
+void decode_grid_definition()
 {
   if (dap_args.grid_definition.type.length() == 0) {
     MySQL::LocalQuery query("select definition,defParams from WGrML.gridDefinitions where code = "+dap_args.grid_definition.code);
     if (query.submit(server) < 0) {
-	std::cerr << "opendap printDDS(1): " << query.error() << " for " << query.show() << std::endl;
-	dapError("500 Internal Server Error","Database error printDDS(1)");
+	std::cerr << "opendap print_DDS(1): " << query.error() << " for " << query.show() << std::endl;
+	dap_error("500 Internal Server Error","Database error print_DDS(1)");
     }
     MySQL::Row row;
     if (!query.fetch_row(row)) {
-	std::cerr << "opendap printDDS(2): " << query.error() << " for " << query.show() << std::endl;
-	dapError("500 Internal Server Error","Database error printDDS(2)");
+	std::cerr << "opendap print_DDS(2): " << query.error() << " for " << query.show() << std::endl;
+	dap_error("500 Internal Server Error","Database error print_DDS(2)");
     }
     dap_args.grid_definition.type=row[0];
     std::deque<std::string> sp=strutils::split(row[1],":");
@@ -406,7 +411,7 @@ void decodeGridDefinition()
 	if (dap_args.grid_definition.type == "gaussLatLon") {
 	  if (gaus_lats == nullptr) {
 	    gaus_lats=new my::map<Grid::GLatEntry>;
-	    fillGaussianLatitudes(*gaus_lats,lat.increment,(lat.start > lat.stop));
+	    gridutils::fill_gaussian_latitudes(config_data.rdadata_home+"/share/GRIB",*gaus_lats,lat.increment,(lat.start > lat.stop));
 	  }
 	  Grid::GLatEntry gle;
 	  gaus_lats->found(lat.increment,gle);
@@ -463,7 +468,7 @@ void decodeGridDefinition()
 // crosses the Greenwich Meridian
 	    grid_subset_args.subset_bounds.wlon+=360.;
 	    dap_args.grid_definition.lon_index.start=floor(grid_subset_args.subset_bounds.wlon/lon.increment);
-	    if (!myequalf(dap_args.grid_definition.lon_index.start*lon.increment,grid_subset_args.subset_bounds.wlon,0.001)) {
+	    if (!floatutils::myequalf(dap_args.grid_definition.lon_index.start*lon.increment,grid_subset_args.subset_bounds.wlon,0.001)) {
 		dap_args.grid_definition.lon_index.start++;
 	    }
 	    dap_args.grid_definition.lon_index.end=floor(grid_subset_args.subset_bounds.elon/lon.increment)+lon.length;
@@ -485,7 +490,7 @@ void decodeGridDefinition()
 		}
 	    }
 	    dap_args.grid_definition.lon_index.start++;
-	    if (myequalf((dap_args.grid_definition.lon_index.end+1)*lon.increment,grid_subset_args.subset_bounds.elon,0.001)) {
+	    if (floatutils::myequalf((dap_args.grid_definition.lon_index.end+1)*lon.increment,grid_subset_args.subset_bounds.elon,0.001)) {
 		dap_args.grid_definition.lon_index.end++;
 	    }
 	  }
@@ -498,21 +503,21 @@ void decodeGridDefinition()
   }
 }
 
-void writeLatitudes(std::ostream& outs,const ProjectionEntry& pe,int lat_index)
+void write_latitudes(std::ostream& outs,const ProjectionEntry& pe,int lat_index)
 {
-  decodeGridDefinition();
+  decode_grid_definition();
   char buf[4];
   int start,stop;
   if (lat_index < 0) {
     if (dap_args.ext != ".ascii") {
-	setBits(buf,lat.length,0,32);
+	bits::set(buf,lat.length,0,32);
     }
     start=dap_args.grid_definition.lat_index.start;
     stop=dap_args.grid_definition.lat_index.end;
   }
   else {
     if (dap_args.ext != ".ascii") {
-	setBits(buf,pe.data->idx[lat_index].length,0,32);
+	bits::set(buf,pe.data->idx[lat_index].length,0,32);
     }
     start=dap_args.grid_definition.lat_index.start+pe.data->idx[lat_index].start;
     stop=dap_args.grid_definition.lat_index.start+pe.data->idx[lat_index].stop;
@@ -536,7 +541,7 @@ void writeLatitudes(std::ostream& outs,const ProjectionEntry& pe,int lat_index)
 	    outs << value.f;
 	  }
 	  else {
-	    setBits(buf,value.i,0,32);
+	    bits::set(buf,value.i,0,32);
 	    outs.write(buf,4);
 	  }
 	}
@@ -545,7 +550,7 @@ void writeLatitudes(std::ostream& outs,const ProjectionEntry& pe,int lat_index)
   else if (dap_args.grid_definition.type == "gaussLatLon") {
     if (gaus_lats == NULL) {
 	gaus_lats=new my::map<Grid::GLatEntry>;
-	fillGaussianLatitudes(*gaus_lats,lat.increment,(lat.start > lat.stop));
+	gridutils::fill_gaussian_latitudes(config_data.rdadata_home+"/share/GRIB",*gaus_lats,lat.increment,(lat.start > lat.stop));
     }
     Grid::GLatEntry gle;
     gaus_lats->found(lat.increment,gle);
@@ -559,7 +564,7 @@ void writeLatitudes(std::ostream& outs,const ProjectionEntry& pe,int lat_index)
 	    outs << value.f;
 	  }
 	  else {
-	    setBits(buf,value.i,0,32);
+	    bits::set(buf,value.i,0,32);
 	    outs.write(buf,4);
 	  }
 	}
@@ -570,21 +575,21 @@ void writeLatitudes(std::ostream& outs,const ProjectionEntry& pe,int lat_index)
   }
 }
 
-void writeLongitudes(std::ostream& outs,const ProjectionEntry& pe,int lon_index)
+void write_longitudes(std::ostream& outs,const ProjectionEntry& pe,int lon_index)
 {
-  decodeGridDefinition();
+  decode_grid_definition();
   char buf[4];
   int start,stop;
   if (lon_index < 0) {
     if (dap_args.ext != ".ascii") {
-	setBits(buf,lon.length,0,32);
+	bits::set(buf,lon.length,0,32);
     }
     start=dap_args.grid_definition.lon_index.start;
     stop=dap_args.grid_definition.lon_index.end;
   }
   else {
     if (dap_args.ext != ".ascii") {
-	setBits(buf,pe.data->idx[lon_index].length,0,32);
+	bits::set(buf,pe.data->idx[lon_index].length,0,32);
     }
     start=dap_args.grid_definition.lon_index.start+pe.data->idx[lon_index].start;
     stop=dap_args.grid_definition.lon_index.start+pe.data->idx[lon_index].stop;
@@ -610,7 +615,7 @@ void writeLongitudes(std::ostream& outs,const ProjectionEntry& pe,int lon_index)
 	  outs << value.f;
 	}
 	else {
-	  setBits(buf,value.i,0,32);
+	  bits::set(buf,value.i,0,32);
 	  outs.write(buf,4);
 	}
     }
@@ -620,7 +625,7 @@ void writeLongitudes(std::ostream& outs,const ProjectionEntry& pe,int lon_index)
   }
 }
 
-std::string addProductCodesToQuery(std::string column_name)
+std::string add_product_codes_to_query(std::string column_name)
 {
   std::string prod_codes;
   if (grid_subset_args.product_codes.size() > 1) {
@@ -639,7 +644,7 @@ std::string addProductCodesToQuery(std::string column_name)
   return prod_codes;
 }
 
-std::string fillParameterQuery(std::string param_ID = "")
+std::string fill_parameter_query(std::string param_ID = "")
 {
   std::string qspec="select distinct ";
   if (param_ID.length() == 0) {
@@ -666,7 +671,7 @@ bool hasReferenceTimes(MySQL::Server& server,MySQL::LocalQuery& query)
   query.set("select dim_name,dim_size from metautil.custom_dap_ref_times where ID = '"+dap_args.ID+"'");
   if (query.submit(server) < 0) {
     std::cerr << "opendap hasReferenceTimes: " << query.error() << " for " << query.show() << std::endl;
-    dapError("500 Internal Server Error","Database error hasReferenceTimes");
+    dap_error("500 Internal Server Error","Database error hasReferenceTimes");
   }
   if (query.num_rows() > 0) {
     return true;
@@ -681,7 +686,7 @@ bool hasForecastHours(MySQL::Server& server,MySQL::LocalQuery& query)
   query.set("select dim_name,dim_size from metautil.custom_dap_fcst_hrs where ID = '"+dap_args.ID+"'");
   if (query.submit(server) < 0) {
     std::cerr << "opendap hasForecastHours: " << query.error() << " for " << query.show() << std::endl;
-    dapError("500 Internal Server Error","Database error hasForecastHours");
+    dap_error("500 Internal Server Error","Database error hasForecastHours");
   }
   if (query.num_rows() > 0) {
     return true;
@@ -696,7 +701,7 @@ bool hasLevels(MySQL::Server& server,MySQL::LocalQuery& query)
   query.set("select dim_name,dim_size from metautil.custom_dap_levels where ID = '"+dap_args.ID+"'");
   if (query.submit(server) < 0) {
     std::cerr << "opendap hasLevels: " << query.error() << " for " << query.show() << std::endl;
-    dapError("500 Internal Server Error","Database error hasLevels");
+    dap_error("500 Internal Server Error","Database error hasLevels");
   }
   if (query.num_rows() > 0) {
     return true;
@@ -706,9 +711,9 @@ bool hasLevels(MySQL::Server& server,MySQL::LocalQuery& query)
   }
 }
 
-void printDDS(std::ostream& outs,std::string content_type,std::string content_description)
+void print_DDS(std::ostream& outs,std::string content_type,std::string content_description)
 {
-  decodeRequestData();
+  decode_request_data();
   std::stringstream dds;
   MySQL::LocalQuery query;
   MySQL::Row row;
@@ -726,8 +731,8 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
     }
     query.set("select dim_name,dim_size from metautil.custom_dap_times where ID = '"+dap_args.ID+"'");
     if (query.submit(server) < 0) {
-	std::cerr << "opendap printDDS(3): " << query.error() << " for " << query.show() << std::endl;
-	dapError("500 Internal Server Error","Database error printDDS(3)");
+	std::cerr << "opendap print_DDS(3): " << query.error() << " for " << query.show() << std::endl;
+	dap_error("500 Internal Server Error","Database error print_DDS(3)");
     }
     while (query.fetch_row(row)) {
 	dds << "  Int32 " << row[0] << "[" << row[0] << " = " << row[1] << "];" << std::endl;
@@ -737,7 +742,7 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
 	  dds << "  Float32 " << row[0] << "[" << row[0] << " = " << row[1] << "];" << std::endl;
 	}
     }
-    decodeGridDefinition();
+    decode_grid_definition();
     dds << "  Float32 lat[lat = " << lat.length << "];" << std::endl;
     dds << "  Float32 lon[lon = " << lon.length << "];" << std::endl;
     std::string qspec;
@@ -754,8 +759,8 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
     query.set(qspec);
 //std::cerr << query.show() << std::endl;
     if (query.submit(server) < 0) {
-	std::cerr << "opendap printDDS(4): " << query.error() << " for " << query.show() << std::endl;
-	dapError("500 Internal Server Error","Database error printDDS(4)");
+	std::cerr << "opendap print_DDS(4): " << query.error() << " for " << query.show() << std::endl;
+	dap_error("500 Internal Server Error","Database error print_DDS(4)");
     }
     my::map<StringEntry> unique_param_table;
     StringEntry se;
@@ -775,13 +780,13 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
 	    MySQL::LocalQuery query2;
 	    query2.set("select l.dim_name,l.dim_size from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID and l.level_code = g.level_code where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+row[0]+"') as x group by x.uID) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
 	    if (query2.submit(server) < 0) {
-		std::cerr << "opendap printDDS(4a): " << query2.error() << " for " << query2.show() << std::endl;
-		dapError("500 Internal Server Error","Database error printDDS(4a)");
+		std::cerr << "opendap print_DDS(4a): " << query2.error() << " for " << query2.show() << std::endl;
+		dap_error("500 Internal Server Error","Database error print_DDS(4a)");
 	    }
 	    MySQL::Row row2;
 	    if (!query2.fetch_row(row2)) {
-		std::cerr << "opendap printDDS(4b): " << query2.error() << " for " << query2.show() << std::endl;
-		dapError("500 Internal Server Error","Database error printDDS(4b)");
+		std::cerr << "opendap print_DDS(4b): " << query2.error() << " for " << query2.show() << std::endl;
+		dap_error("500 Internal Server Error","Database error print_DDS(4b)");
 	    }
 	    if (row2[0].length() > 0) {
 		dds_a << "[" << row2[0] << " = " << row2[1] << "]";
@@ -808,8 +813,8 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
 	    else {
 		query.set("select dim_size from metautil.custom_dap_times where ID = '"+dap_args.ID+"' and dim_name = '"+key+"'");
 		if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		  std::cerr << "opendap printDDS(7a): " << query.error() << " for " << query.show() << std::endl;
-		  dapError("500 Internal Server Error","Database error printDDS(7a)");
+		  std::cerr << "opendap print_DDS(7a): " << query.error() << " for " << query.show() << std::endl;
+		  dap_error("500 Internal Server Error","Database error print_DDS(7a)");
 		}
 		dds << "  Int32 " << key << "[" << key << " = " << row[0] << "];" << std::endl;
 	    }
@@ -821,8 +826,8 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
 	    else {
 		query.set("select dim_size from metautil.custom_dap_ref_times where ID = '"+dap_args.ID+"' and dim_name = '"+key+"'");
 		if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		  std::cerr << "opendap printDDS(7b): " << query.error() << " for " << query.show() << std::endl;
-		  dapError("500 Internal Server Error","Database error printDDS(7b)");
+		  std::cerr << "opendap print_DDS(7b): " << query.error() << " for " << query.show() << std::endl;
+		  dap_error("500 Internal Server Error","Database error print_DDS(7b)");
 		}
 		dds << "  Int32 " << key << "[" << key << " = " << row[0] << "];" << std::endl;
 	    }
@@ -834,8 +839,8 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
 	    else {
 		query.set("select dim_size from metautil.custom_dap_fcst_hrs where ID = '"+dap_args.ID+"' and dim_name = '"+key+"'");
 		if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		  std::cerr << "opendap printDDS(7c): " << query.error() << " for " << query.show() << std::endl;
-		  dapError("500 Internal Server Error","Database error printDDS(7c)");
+		  std::cerr << "opendap print_DDS(7c): " << query.error() << " for " << query.show() << std::endl;
+		  dap_error("500 Internal Server Error","Database error print_DDS(7c)");
 		}
 		dds << "  Int32 " << key << "[" << key << " = " << row[0] << "];" << std::endl;
 	    }
@@ -843,17 +848,17 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
 	  else if (std::regex_search(key,std::regex("^level"))) {
 	    query.set("select dim_size from metautil.custom_dap_levels where ID = '"+dap_args.ID+"' and dim_name = '"+key+"'");
 	    if (query.submit(server) < 0 || !query.fetch_row(row)) {
-		std::cerr << "opendap printDDS(8): " << query.error() << " for " << query.show() << std::endl;
-		dapError("500 Internal Server Error","Database error printDDS(8)");
+		std::cerr << "opendap print_DDS(8): " << query.error() << " for " << query.show() << std::endl;
+		dap_error("500 Internal Server Error","Database error print_DDS(8)");
 	    }
 	    dds << "  Float32 " << key << "[" << key << " = " << row[0] << "];" << std::endl;
 	  }
 	  else if (std::regex_search(key,std::regex("^lat"))) {
-	    decodeGridDefinition();
+	    decode_grid_definition();
 	    dds << "  Float32 lat[lat = " << lat.length << "];" << std::endl;
 	  }
 	  else if (std::regex_search(key,std::regex("^lon"))) {
-	    decodeGridDefinition();
+	    decode_grid_definition();
 	    dds << "  Float32 lon[lon = " << lon.length << "];" << std::endl;
 	  }
 	  else {
@@ -899,7 +904,7 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
 		    pe.data->idx.emplace_back(di);
 		  }
 		}
-		decodeGridDefinition();
+		decode_grid_definition();
 		di.length=lat.length;
 		di.start=0;
 		di.stop=di.length-1;
@@ -1080,7 +1085,7 @@ void printDDS(std::ostream& outs,std::string content_type,std::string content_de
   }
   outs << "Content-Type: " << content_type << std::endl;
   outs << "Content-Description: " << content_description << std::endl;
-  printDateAndVersion(outs);
+  print_date_and_version(outs);
   outs << std::endl;
   outs << "Dataset {" << std::endl;
   outs << dds.str();
@@ -1105,7 +1110,7 @@ struct ParameterEntry {
   std::shared_ptr<Data> data;
 };
 
-void printGlobalAttributes()
+void print_global_attributes()
 {
   MySQL::LocalQuery query("title","search.datasets","dsid = '"+dap_args.dsnum+"'");
   MySQL::Row row;
@@ -1141,7 +1146,7 @@ void printGlobalAttributes()
   }
 }
 
-void printRefTimes()
+void print_reference_times()
 {
   MySQL::LocalQuery query("select dim_name,dim_size,base_time from metautil.custom_dap_ref_times where ID = '"+dap_args.ID+"'");
   if (query.submit(server) == 0) {
@@ -1150,7 +1155,7 @@ void printRefTimes()
 	if (dap_args.ext == ".das") {
 	  std::cout << "  " << row["dim_name"] << " {" << std::endl;
 	  std::cout << "    String long_name \"forecast_reference_time\";" << std::endl;
-	  std::cout << "    String units \"minutes since " << DateTime(std::stoll(row["base_time"])*100).toString("%Y-%m-%d %H:%MM +0:00") << "\";" << std::endl;
+	  std::cout << "    String units \"minutes since " << DateTime(std::stoll(row["base_time"])*100).to_string("%Y-%m-%d %H:%MM +0:00") << "\";" << std::endl;
 	  std::cout << "    String calendar \"standard\";" << std::endl;
 	  std::cout << "  }" << std::endl;
 	}
@@ -1158,7 +1163,7 @@ void printRefTimes()
 	  std::cout << "<tr valign=\"top\"><td align=\"right\"><strong>" << row["dim_name"] << ":</strong></td><td>&nbsp;</td><td align=\"left\">Array of 32 bit Integers [" << row["dim_name"] << " = 0.." << (std::stoi(row["dim_size"])-1) << "]</td></tr>" << std::endl;
 	  std::cout << "<tr valign=\"top\"><td></td><td></td><td>";
 	  std::cout << "<strong>long_name:</strong>&nbsp;forecast_reference_time<br />";
-	  std::cout << "<strong>units:</strong>&nbsp;minutes since " << DateTime(std::stoll(row["base_time"])*100).toString("%Y-%m-%d %H:%MM +0:00") << "<br />";
+	  std::cout << "<strong>units:</strong>&nbsp;minutes since " << DateTime(std::stoll(row["base_time"])*100).to_string("%Y-%m-%d %H:%MM +0:00") << "<br />";
 	  std::cout << "<strong>calendar:</strong>&nbsp;standard<br />";
 	  std::cout << "</td></tr>" << std::endl;
 	}
@@ -1166,7 +1171,7 @@ void printRefTimes()
   }
 }
 
-void printTimes(std::string time_ID = "")
+void print_times(std::string time_ID = "")
 {
   auto qspec="select dim_name,dim_size from metautil.custom_dap_times where ID = '"+dap_args.ID+"'";
   if (time_ID.length() > 0) {
@@ -1184,7 +1189,7 @@ void printTimes(std::string time_ID = "")
 	  else {
 	    std::cout << "    String long_name \"time\";" << std::endl;
 	  }
-	  std::cout << "    String units \"minutes since " << DateTime(std::stoll(grid_subset_args.startdate)*100).toString("%Y-%m-%d %H:%MM +0:00") << "\";" << std::endl;
+	  std::cout << "    String units \"minutes since " << DateTime(std::stoll(grid_subset_args.startdate)*100).to_string("%Y-%m-%d %H:%MM +0:00") << "\";" << std::endl;
 	  std::cout << "    String calendar \"standard\";" << std::endl;
 	  std::cout << "  }" << std::endl;
 	}
@@ -1192,7 +1197,7 @@ void printTimes(std::string time_ID = "")
 	  std::cout << "<tr valign=\"top\"><td align=\"right\"><strong>" << row["dim_name"] << ":</strong></td><td>&nbsp;</td><td align=\"left\">Array of 32 bit Integers [" << row["dim_name"] << " = 0.." << (std::stoi(row["dim_size"])-1) << "]</td></tr>" << std::endl;
 	  std::cout << "<tr valign=\"top\"><td></td><td></td><td>";
 	  std::cout << "<strong>long_name:</strong>&nbsp;time<br />";
-	  std::cout << "<strong>units:</strong>&nbsp;minutes since " << DateTime(std::stoll(grid_subset_args.startdate)*100).toString("%Y-%m-%d %H:%MM +0:00") << "<br />";
+	  std::cout << "<strong>units:</strong>&nbsp;minutes since " << DateTime(std::stoll(grid_subset_args.startdate)*100).to_string("%Y-%m-%d %H:%MM +0:00") << "<br />";
 	  std::cout << "<strong>calendar:</strong>&nbsp;standard<br />";
 	  std::cout << "</td></tr>" << std::endl;
 	}
@@ -1200,7 +1205,7 @@ void printTimes(std::string time_ID = "")
   }
 }
 
-void printFcstHrs(std::string fcst_hr_ID = "")
+void print_forecast_hours(std::string fcst_hr_ID = "")
 {
   auto qspec="select dim_name,dim_size from metautil.custom_dap_fcst_hrs where ID = '"+dap_args.ID+"'";
   if (fcst_hr_ID.length() > 0) {
@@ -1227,7 +1232,7 @@ void printFcstHrs(std::string fcst_hr_ID = "")
   }
 }
 
-void printLevels(std::string format,xmlutils::LevelMapper& level_mapper,std::string level_ID = "")
+void print_levels(std::string format,xmlutils::LevelMapper& level_mapper,std::string level_ID = "")
 {
   std::string qspec="select distinct i.level_key,l.dim_name,l.dim_size from metautil.custom_dap_level_index as i left join metautil.custom_dap_levels as l on l.ID = i.ID and l.level_key = i.level_key where i.ID = '"+dap_args.ID+"'";
   if (level_ID.length() > 0) {
@@ -1238,14 +1243,14 @@ void printLevels(std::string format,xmlutils::LevelMapper& level_mapper,std::str
     MySQL::Row row;
     while (query.fetch_row(row)) {
 	auto sp=strutils::split(row[0],":");
-	auto sdum=level_mapper.getDescription(format,sp[1],sp[0]);
+	auto sdum=level_mapper.description(format,sp[1],sp[0]);
 	if (dap_args.ext == ".das") {
 	  std::cout << "  " << row[1] << " {" << std::endl;
 	  std::cout << "    String description \"" << sdum << "\";" << std::endl;
 	  if (std::regex_search(sdum,std::regex("^Layer"))) {
 	    std::cout << "    String comment \"Values are the midpoints of the layers\";" << std::endl;
 	  }
-	  std::cout << "    String units \"" << level_mapper.getUnits(format,sp[1],sp[0]) << "\";" << std::endl;
+	  std::cout << "    String units \"" << level_mapper.units(format,sp[1],sp[0]) << "\";" << std::endl;
 	  std::cout << "  }" << std::endl;
 	}
 	else if (dap_args.ext == ".info") {
@@ -1255,14 +1260,14 @@ void printLevels(std::string format,xmlutils::LevelMapper& level_mapper,std::str
 	  if (std::regex_search(sdum,std::regex("^Layer"))) {
 	    std::cout << "<strong>comment:</strong>&nbsp;degrees_north<br />";
 	  }
-	  std::cout << "<strong>units:</strong>&nbsp;" << level_mapper.getUnits(format,sp[1],sp[0]) << "<br />";
+	  std::cout << "<strong>units:</strong>&nbsp;" << level_mapper.units(format,sp[1],sp[0]) << "<br />";
 	  std::cout << "</td></tr>" << std::endl;
 	}
     }
   }
 }
 
-void printLatitudeAndLongitude()
+void print_latitude_and_longitude()
 {
   if (dap_args.ext == ".das") {
     std::cout << "  lat {" << std::endl;
@@ -1275,7 +1280,7 @@ void printLatitudeAndLongitude()
     std::cout << "  }" << std::endl;
   }
   else if (dap_args.ext == ".info") {
-    decodeGridDefinition();
+    decode_grid_definition();
     std::cout << "<tr valign=\"top\"><td align=\"right\"><strong>lat:</strong></td><td>&nbsp;</td><td align=\"left\">Array of 32 bit Reals [lat = 0.." << (lat.length-1) << "]</td></tr>";
     std::cout << "<tr valign=\"top\"><td></td><td></td><td>";
     std::cout << "<strong>long_name:</strong>&nbsp;latitude<br />";
@@ -1288,7 +1293,7 @@ void printLatitudeAndLongitude()
     std::cout << "</td></tr>" << std::endl;
   }
 }
-void printParameterAttributes(std::string format,std::string param_ID,std::string description,std::string units)
+void print_parameter_attributes(std::string format,std::string param_ID,std::string description,std::string units)
 {
   if (dap_args.ext == ".das") {
     std::cout << "  " << param_ID << " {" << std::endl;
@@ -1296,7 +1301,7 @@ void printParameterAttributes(std::string format,std::string param_ID,std::strin
 	std::cout << "    String long_name \"" << description << "\";" << std::endl;
 	std::cout << "    String units \"" << units << "\";" << std::endl;
 	if (format == "WMO_GRIB1" || format == "WMO_GRIB2") {
-	  std::cout << "    Float32 _FillValue " << Grid::missingValue << ";" << std::endl;
+	  std::cout << "    Float32 _FillValue " << Grid::missing_value << ";" << std::endl;
 	}
 	if (grid_subset_args.inittime.length() > 0) {
 	  std::cout << "    String model_initialization_time \"" << grid_subset_args.inittime << " UTC\";" << std::endl;
@@ -1311,13 +1316,13 @@ void printParameterAttributes(std::string format,std::string param_ID,std::strin
 	std::cout << "<strong>long_name:</strong>&nbsp;" << description << "<br />";
 	std::cout << "<strong>units:</strong>&nbsp;" << units << "<br />";
 	if (format == "WMO_GRIB1" || format == "WMO_GRIB2") {
-	  std::cout << "<strong>_FillValue:</strong>&nbsp;" << Grid::missingValue << "<br />";
+	  std::cout << "<strong>_FillValue:</strong>&nbsp;" << Grid::missing_value << "<br />";
 	}
 	if (grid_subset_args.inittime.length() > 0) {
 	  std::cout << "<strong>model_initialization_time:</strong>&nbsp;" << grid_subset_args.inittime << "<br />";
 	}
 	std::cout << "<table cellspacing=\"0\" cellpadding=\"0\" border=\"0\">";
-	auto qspec=fillParameterQuery(param_ID);
+	auto qspec=fill_parameter_query(param_ID);
 	MySQL::LocalQuery query(qspec);
 	if (query.submit(server) == 0) {
 	  MySQL::Row row;
@@ -1342,25 +1347,25 @@ void printParameterAttributes(std::string format,std::string param_ID,std::strin
 	    std::cout << "<tr valign=\"top\"><td></td><td></td><td align=\"left\"><strong>long_name:</strong>&nbsp;" << description << "</td></tr>";
 	    std::cout << "<tr valign=\"top\"><td></td><td></td><td align=\"left\"><strong>units:</strong>&nbsp;" << units << "</td></tr>";
 	    if (format == "WMO_GRIB1" || format == "WMO_GRIB2") {
-		std::cout << "<tr valign=\"top\"><td></td><td></td><td align=\"left\"><strong>_FillValue:</strong>&nbsp;" << Grid::missingValue << "</td></tr>";
+		std::cout << "<tr valign=\"top\"><td></td><td></td><td align=\"left\"><strong>_FillValue:</strong>&nbsp;" << Grid::missing_value << "</td></tr>";
 	    }
 	    if (grid_subset_args.inittime.length() > 0) {
 		std::cout << "<tr valign=\"top\"><td></td><td></td><td align=\"left\"><strong>model_initialization_time:</strong>&nbsp;" << grid_subset_args.inittime << "</td></tr>";
 	    }
 	    if (!row[5].empty()) {
-		printRefTimes();
+		print_reference_times();
 	    }
 	    if (std::regex_search(row[0],std::regex("^fcst_hr"))) {
-		printFcstHrs(row[0]);
+		print_forecast_hours(row[0]);
 	    }
 	    else {
-		printTimes(row[0]);
+		print_times(row[0]);
 	    }
 	    if (row[2].length() > 0) {
-		xmlutils::LevelMapper level_mapper;
-		printLevels(format,level_mapper,row[2]);
+		xmlutils::LevelMapper level_mapper(config_data.rdadata_home+"/share/metadata/LevelTables");
+		print_levels(format,level_mapper,row[2]);
 	    }
-	    printLatitudeAndLongitude();
+	    print_latitude_and_longitude();
 	  }
 	}
 	std::cout << "</table>";
@@ -1369,7 +1374,7 @@ void printParameterAttributes(std::string format,std::string param_ID,std::strin
   }
 }
 
-void printParameters(std::string& format,xmlutils::LevelMapper& level_mapper)
+void print_parameters(std::string& format,xmlutils::LevelMapper& level_mapper)
 {
   ParameterEntry pe;
   MySQL::LocalQuery query;
@@ -1377,7 +1382,7 @@ void printParameters(std::string& format,xmlutils::LevelMapper& level_mapper)
   my::map<FormatEntry> unique_formats_table;
   my::map<ParameterEntry> parameter_table;
   for (const auto& key : grid_subset_args.parameters.keys()) {
-    gridSubset::Parameter param;
+    gridutils::gridSubset::Parameter param;
     grid_subset_args.parameters.found(key,param);
     if (param.format_code != nullptr) {
 	FormatEntry fe;
@@ -1390,13 +1395,13 @@ void printParameters(std::string& format,xmlutils::LevelMapper& level_mapper)
 	    unique_formats_table.insert(fe);
 	  }
 	}
-	xmlutils::ParameterMapper parameter_mapper;
-	pe.key=strutils::substitute(parameter_mapper.getShortName(*fe.format,key)," ","_");
+	xmlutils::ParameterMapper parameter_mapper(config_data.rdadata_home+"/share/metadata/ParameterTables");
+	pe.key=strutils::substitute(parameter_mapper.short_name(*fe.format,key)," ","_");
 	if (!parameter_table.found(pe.key,pe)) {
 	  pe.data.reset(new ParameterEntry::Data);
 	  pe.data->format=*fe.format;
-	  pe.data->long_name=parameter_mapper.getDescription(*fe.format,key);
-	  pe.data->units=parameter_mapper.getUnits(*fe.format,key);
+	  pe.data->long_name=parameter_mapper.description(*fe.format,key);
+	  pe.data->units=parameter_mapper.units(*fe.format,key);
 	  parameter_table.insert(pe);
 	}
     }
@@ -1404,16 +1409,16 @@ void printParameters(std::string& format,xmlutils::LevelMapper& level_mapper)
   format=pe.data->format;
   query.set("select distinct param from metautil.custom_dap_grid_index where ID = '"+dap_args.ID+"' and time_slice_index = 0");
   if (query.submit(server) < 0) {
-    std::cerr << "opendap printDAS(1): " << query.error() << " for " << query.show() << std::endl;
-    dapError("500 Internal Server Error","Database error printDAS(1)");
+    std::cerr << "opendap print_DAS(1): " << query.error() << " for " << query.show() << std::endl;
+    dap_error("500 Internal Server Error","Database error print_DAS(1)");
   }
   while (query.fetch_row(row)) {
     parameter_table.found(row[0].substr(0,row[0].rfind("_")),pe);
     MySQL::LocalQuery query2;
     query2.set("select l.level_key,y.level_codes from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size,group_concat(x.level_code separator '!') as level_codes from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID and l.level_code = g.level_code where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+row[0]+"') as x group by x.uID) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
     if (query2.submit(server) < 0) {
-	std::cerr << "opendap printDAS(1a): " << query2.error() << " for " << query2.show() << std::endl;
-	dapError("500 Internal Server Error","Database error printDAS(1a)");
+	std::cerr << "opendap print_DAS(1a): " << query2.error() << " for " << query2.show() << std::endl;
+	dap_error("500 Internal Server Error","Database error print_DAS(1a)");
     }
     MySQL::Row row2;
     while (query2.fetch_row(row2)) {
@@ -1422,36 +1427,36 @@ void printParameters(std::string& format,xmlutils::LevelMapper& level_mapper)
 	  MySQL::Row row3;
 	  query3.set("select distinct l.type,l.map,l.value,f.format from metautil.custom_dap_grid_index as g left join WGrML.levels as l on l.code = g.level_code left join WGrML.ds"+dap_args.dsnum2+"_webfiles as w on w.code = g.webID_code left join WGrML.formats as f on f.code = w.format_code where g.param = '"+row[0]+"' and g.ID = '"+dap_args.ID+"' and g.time_slice_index = 0");
 	  if (query3.submit(server) < 0) {
-	    std::cerr << "opendap printDAS(1b): " << query2.error() << " for " << query2.show() << std::endl;
-	    dapError("500 Internal Server Error","Database error printDAS(1b)");
+	    std::cerr << "opendap print_DAS(1b): " << query2.error() << " for " << query2.show() << std::endl;
+	    dap_error("500 Internal Server Error","Database error print_DAS(1b)");
 	  }
 	  while (query3.fetch_row(row3)) {
-	    auto lunits=level_mapper.getUnits(row3[3],row3[0],row3[1]);
+	    auto lunits=level_mapper.units(row3[3],row3[0],row3[1]);
 	    if (lunits.length() > 0) {
-		printParameterAttributes(row3[3],strutils::substitute(row[0]," ","_"),pe.data->long_name+" at "+row3[2]+" "+lunits,pe.data->units);
+		print_parameter_attributes(row3[3],strutils::substitute(row[0]," ","_"),pe.data->long_name+" at "+row3[2]+" "+lunits,pe.data->units);
 	    }
 	    else {
 		std::string ldes="";
 		if (std::regex_search(row3[0],std::regex("-")) && std::regex_search(row3[2],std::regex(","))) {
-		  ldes+=" in "+level_mapper.getDescription(row3[3],row3[0],row3[1]);
+		  ldes+=" in "+level_mapper.description(row3[3],row3[0],row3[1]);
 		  auto sp=strutils::split(row3[0],"-");
 		  auto sp2=strutils::split(row3[2],",");
-		  ldes+=" - top: "+sp2[1]+" "+level_mapper.getUnits(row3[3],sp[1],row3[1])+" bottom: "+sp2[0]+" "+level_mapper.getUnits(row3[3],sp[0],row3[1]);
+		  ldes+=" - top: "+sp2[1]+" "+level_mapper.units(row3[3],sp[1],row3[1])+" bottom: "+sp2[0]+" "+level_mapper.units(row3[3],sp[0],row3[1]);
 		}
 		else {
-		  ldes+=" at "+level_mapper.getDescription(row3[3],row3[0],row3[1]);
+		  ldes+=" at "+level_mapper.description(row3[3],row3[0],row3[1]);
 		  if (row3[2] != "0") {
 		    ldes+=" "+row3[2];
 		  }
 		}
-		printParameterAttributes(row3[3],strutils::substitute(row[0]," ","_"),pe.data->long_name+ldes,pe.data->units);
+		print_parameter_attributes(row3[3],strutils::substitute(row[0]," ","_"),pe.data->long_name+ldes,pe.data->units);
 	    }
 	    format=row3[3];
 	  }
 	}
 	else {
 	  auto sp=strutils::split(row2[0],":");
-	  auto ldes=level_mapper.getDescription(format,sp[1],sp[0]);
+	  auto ldes=level_mapper.description(format,sp[1],sp[0]);
 	  sp=strutils::split(row2[1],"!");
 	  auto sdum=" at ";
 	  for (const auto& p : sp) {
@@ -1459,42 +1464,42 @@ void printParameters(std::string& format,xmlutils::LevelMapper& level_mapper)
 		sdum=" in ";
 	    }
 	  }
-	  printParameterAttributes(format,strutils::substitute(row[0]," ","_"),pe.data->long_name+sdum+ldes,pe.data->units);
+	  print_parameter_attributes(format,strutils::substitute(row[0]," ","_"),pe.data->long_name+sdum+ldes,pe.data->units);
 	}
     }
   }
 }
 
-void printDAS()
+void print_DAS()
 {
-  decodeRequestData();
+  decode_request_data();
   std::cout << "Content-Type: text/plain" << std::endl;
   std::cout << "Content-Description: dods-das" << std::endl;
-  printDateAndVersion(std::cout);
+  print_date_and_version(std::cout);
   std::cout << std::endl;
   std::cout << "Attributes {" << std::endl;
   std::cout << "  NC_GLOBAL {" << std::endl;
-  printGlobalAttributes();
+  print_global_attributes();
   std::cout << "  }" << std::endl;
-  printRefTimes();
-  printTimes();
-  printFcstHrs();
-  printLatitudeAndLongitude();
+  print_reference_times();
+  print_times();
+  print_forecast_hours();
+  print_latitude_and_longitude();
   std::string format;
-  xmlutils::LevelMapper level_mapper;
-  printParameters(format,level_mapper);
-  printLevels(format,level_mapper);
+  xmlutils::LevelMapper level_mapper(config_data.rdadata_home+"/share/metadata/LevelTables");
+  print_parameters(format,level_mapper);
+  print_levels(format,level_mapper);
   std::cout << "}" << std::endl;
 }
 
-void printInfo()
+void print_info()
 {
-  decodeRequestData();
+  decode_request_data();
   std::cout << "Content-type: text/html" << std::endl << std::endl;
   std::cout << "<h3>Dataset Information</h3>" << std::endl;
   std::cout << "<center>" << std::endl;
   std::cout << "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\">" << std::endl;
-  printGlobalAttributes();
+  print_global_attributes();
   std::cout << "</table>" << std::endl;
   std::cout << "</center>" << std::endl;
   std::cout << "<p></p>" << std::endl;
@@ -1502,19 +1507,19 @@ void printInfo()
   std::cout << "<h3>Variables in this Dataset</h3>" << std::endl;
   std::cout << "<center>" << std::endl;
   std::cout << "<table cellpadding=\"0\" cellspacing=\"0\" border=\"0\">" << std::endl;
-  printRefTimes();
-  printTimes();
-  printFcstHrs();
-  printLatitudeAndLongitude();
+  print_reference_times();
+  print_times();
+  print_forecast_hours();
+  print_latitude_and_longitude();
   std::string format;
-  xmlutils::LevelMapper level_mapper;
-  printParameters(format,level_mapper);
-  printLevels(format,level_mapper);
+  xmlutils::LevelMapper level_mapper(config_data.rdadata_home+"/share/metadata/LevelTables");
+  print_parameters(format,level_mapper);
+  print_levels(format,level_mapper);
   std::cout << "</table>" << std::endl;
   std::cout << "</center>" << std::endl;
 }
 
-void outputDODSData(std::stringstream& dds,const ProjectionEntry& pe)
+void output_DODS_data(std::stringstream& dds,const ProjectionEntry& pe)
 {
 clock_gettime(CLOCK_REALTIME,&tp);
   size_t lat_idx=pe.data->idx.size()-2,lon_idx=pe.data->idx.size()-1;
@@ -1541,7 +1546,7 @@ clock_gettime(CLOCK_REALTIME,&tp);
     }
   }
   if ((num_points*4) > 0x7fffffff) {
-    dapError("400 Bad Request","Array size exceeds 2GB");
+    dap_error("400 Bad Request","Array size exceeds 2GB");
   }
   else {
     std::cout << dds.str();
@@ -1570,7 +1575,7 @@ std::cerr << "but it did happen (2)" << std::endl;
   }
   if (dap_args.ext == ".dods") {
     char buf[4];
-    setBits(buf,num_points,0,32);
+    bits::set(buf,num_points,0,32);
     std::cout.write(buf,4);
     std::cout.write(buf,4);
   }
@@ -1742,7 +1747,7 @@ std::cerr << "but it did happen (2)" << std::endl;
 	float *fpoints=new float[grid_size];
 	char *buffer=new char[grid_size*4];
 	char *mbuffer=nullptr;
-	decodeGridDefinition();
+	decode_grid_definition();
 	std::unique_ptr<GRIBMessage> msg(nullptr);
 	std::unique_ptr<GRIB2Message> msg2(nullptr);
 	char *filebuf=nullptr;
@@ -1760,7 +1765,7 @@ std::cerr << "but it did happen (2)" << std::endl;
 		  ifs.close();
 		  ifs.clear();
 		}
-		ifs.open(("/glade/p/rda/data/ds"+dap_args.dsnum+"/"+row[1]));
+		ifs.open(("/data/rda/data/ds"+dap_args.dsnum+"/"+row[1]));
 		last_offset=0;
 	    }
 	    if (ifs.is_open()) {
@@ -1780,32 +1785,32 @@ std::cerr << "but it did happen (2)" << std::endl;
 		    msg.reset(new GRIBMessage);
 		  }
 		  msg->fill(reinterpret_cast<unsigned char *>(filebuf),false);
-		  grid=msg->getGrid(0);
+		  grid=msg->grid(0);
 		}
 		else {
 		  if (msg2 == nullptr) {
 		    msg2.reset(new GRIB2Message);
 		  }
-		  msg2->quickFill(reinterpret_cast<unsigned char *>(filebuf));
-		  if (msg2->getNumberOfGrids() > 1) {
-		    for (size_t n=0; n < msg2->getNumberOfGrids(); ++n) {
+		  msg2->quick_fill(reinterpret_cast<unsigned char *>(filebuf));
+		  if (msg2->number_of_grids() > 1) {
+		    for (size_t n=0; n < msg2->number_of_grids(); ++n) {
 			std::stringstream ss;
-			auto g=msg2->getGrid(n);
-			ss << reinterpret_cast<GRIB2Grid *>(g)->getDiscipline() << "." << reinterpret_cast<GRIB2Grid *>(g)->getParameterCategory() << "." << g->getParameter();
+			auto g=msg2->grid(n);
+			ss << reinterpret_cast<GRIB2Grid *>(g)->discipline() << "." << reinterpret_cast<GRIB2Grid *>(g)->parameter_category() << "." << g->parameter();
 			for (const auto& code : pdata.data->codes) {
 			  if (std::regex_search(code,std::regex(":"+ss.str()+"$"))) {
 			    grid=g;
-			    n=msg2->getNumberOfGrids();
+			    n=msg2->number_of_grids();
 			  }
 			}
 		    }
 		  }
 		  else {
-		    grid=msg2->getGrid(0);
+		    grid=msg2->grid(0);
 		  }
 		}
 		if (grid != nullptr) {
-		  double **gridpoints=grid->getGridpoints();
+		  double **gridpoints=grid->gridpoints();
 		  int n_end=dap_args.grid_definition.lat_index.start+pe.data->idx[lat_idx].start+pe.data->idx[lat_idx].length;
 		  int m_end=dap_args.grid_definition.lon_index.start+pe.data->idx[lon_idx].start+pe.data->idx[lon_idx].length;
 		  size_t foff;
@@ -1856,16 +1861,16 @@ std::cerr << "but it did happen (2)" << std::endl;
 		    if (mbuffer == nullptr) {
 			mbuffer=new char[grid_size*4];
 			for (size_t n=0; n < grid_size; ++n) {
-			  fpoints[n]=Grid::missingValue;
+			  fpoints[n]=Grid::missing_value;
 			}
-			setBits(mbuffer,reinterpret_cast<int *>(fpoints),0,32,0,grid_size);
+			bits::set(mbuffer,reinterpret_cast<int *>(fpoints),0,32,0,grid_size);
 		    }
 		    while (next_off < foff) {
 			std::cout.write(mbuffer,grid_size*4);
 			next_off+=grid_size;
 		    }
 		  }
-		  short dimx=grid->getDimensions().x;
+		  short dimx=grid->dimensions().x;
 		  auto idx=0;
 		  for (int n=dap_args.grid_definition.lat_index.start+pe.data->idx[lat_idx].start; n < n_end; n+=pe.data->idx[lat_idx].increment) {
 		    for (int m=dap_args.grid_definition.lon_index.start+pe.data->idx[lon_idx].start; m < m_end; m+=pe.data->idx[lon_idx].increment) {
@@ -1895,7 +1900,7 @@ std::cerr << "but it did happen (2)" << std::endl;
 		    }
 		  }
 		  if (dap_args.ext == ".dods") {
-		    setBits(buffer,reinterpret_cast<int *>(fpoints),0,32,0,grid_size);
+		    bits::set(buffer,reinterpret_cast<int *>(fpoints),0,32,0,grid_size);
 		    std::cout.write(buffer,grid_size*4);
 		  }
 		  next_off=foff+grid_size;
@@ -1908,8 +1913,8 @@ std::cerr << "but it did happen (2)" << std::endl;
     }
     else {
 	auto mbuffer=new char[4];
-	float f[]={static_cast<float>(Grid::missingValue)};
-	setBits(mbuffer,reinterpret_cast<int *>(f),0,32,0,1);
+	float f[]={static_cast<float>(Grid::missing_value)};
+	bits::set(mbuffer,reinterpret_cast<int *>(f),0,32,0,1);
 	for (size_t n=0; n < grid_size; ++n) {
 	  std::cout.write(mbuffer,4);
 	}
@@ -1917,36 +1922,36 @@ std::cerr << "but it did happen (2)" << std::endl;
   }
   if (pe.data->member.length() == 0) {
     if (pe.data->ref_time_dim.name.length() > 0) {
-	writeRefTimes(std::cout,pe,0);
+	write_reference_times(std::cout,pe,0);
 	if (pe.data->time_dim.name.length() > 0) {
-	  writeTimes(std::cout,pe,1);
+	  write_times(std::cout,pe,1);
 	}
 	else {
-	  writeFcstHrs(std::cout,pe,1);
+	  write_forecast_hours(std::cout,pe,1);
 	}
 	if (pe.data->idx.size() == 5) {
-	  writeLevels(std::cout,pe,2);
+	  write_levels(std::cout,pe,2);
 	}
     }
     else {
-	writeTimes(std::cout,pe,0);
+	write_times(std::cout,pe,0);
 	if (pe.data->idx.size() == 4) {
-	  writeLevels(std::cout,pe,1);
+	  write_levels(std::cout,pe,1);
 	}
     }
-    writeLatitudes(std::cout,pe,lat_idx);
-    writeLongitudes(std::cout,pe,lon_idx);
+    write_latitudes(std::cout,pe,lat_idx);
+    write_longitudes(std::cout,pe,lon_idx);
   }
 }
 
-void outputDODS()
+void output_DODS()
 {
   std::stringstream dds;
-  printDDS(dds,"application/octet-stream","dods-data");
+  print_DDS(dds,"application/octet-stream","dods-data");
   dds << std::endl;
   dds << "Data:" << std::endl;
   if (projection_table.size() == 0) {
-    dapError("400 Bad Request","Bad request (dods)");
+    dap_error("400 Bad Request","Bad request (dods)");
   }
   else {
     for (const auto& key : projection_table.keys()) {
@@ -1955,28 +1960,28 @@ void outputDODS()
 	if (std::regex_search(pe.key,std::regex("^(v){0,1}time"))) {
 	  std::cout << dds.str();
 	  if (pe.data->idx.size() == 1) {
-	    writeTimes(std::cout,pe,0);
+	    write_times(std::cout,pe,0);
 	  }
 	  else {
-	    writeTimes(std::cout,pe,-1);
+	    write_times(std::cout,pe,-1);
 	  }
 	}
 	else if (std::regex_search(pe.key,std::regex("^ref_time"))) {
 	  std::cout << dds.str();
 	  if (pe.data->idx.size() == 1) {
-	    writeRefTimes(std::cout,pe,0);
+	    write_reference_times(std::cout,pe,0);
 	  }
 	  else {
-	    writeRefTimes(std::cout,pe,-1);
+	    write_reference_times(std::cout,pe,-1);
 	  }
 	}
 	else if (std::regex_search(pe.key,std::regex("^fcst_hr"))) {
 	  std::cout << dds.str();
 	  if (pe.data->idx.size() == 1) {
-	    writeFcstHrs(std::cout,pe,0);
+	    write_forecast_hours(std::cout,pe,0);
 	  }
 	  else {
-	    writeFcstHrs(std::cout,pe,-1);
+	    write_forecast_hours(std::cout,pe,-1);
 	  }
 	}
 	else if (std::regex_search(pe.key,std::regex("^level"))) {
@@ -1984,29 +1989,29 @@ void outputDODS()
 	  if (pe.data->idx.size() > 0) {
 	  }
 	  else {
-	    writeLevels(std::cout,pe,-1);
+	    write_levels(std::cout,pe,-1);
 	  }
 	}
 	else if (pe.key == "lat") {
 	  std::cout << dds.str();
 	  if (pe.data->idx.size() == 1) {
-	    writeLatitudes(std::cout,pe,0);
+	    write_latitudes(std::cout,pe,0);
 	  }
 	  else {
-	    writeLatitudes(std::cout,pe,-1);
+	    write_latitudes(std::cout,pe,-1);
 	  }
 	}
 	else if (pe.key == "lon") {
 	  std::cout << dds.str();
 	  if (pe.data->idx.size() == 1) {
-	    writeLongitudes(std::cout,pe,0);
+	    write_longitudes(std::cout,pe,0);
 	  }
 	  else {
-	    writeLongitudes(std::cout,pe,-1);
+	    write_longitudes(std::cout,pe,-1);
 	  }
 	}
 	else if (pe.data->idx.size() >= 3 && pe.data->idx.size() <= 5) {
-	  outputDODSData(dds,pe);
+	  output_DODS_data(dds,pe);
 	}
 	dds.str("");
     }
@@ -2020,9 +2025,9 @@ int main(int argc,char **argv)
   MySQL::Row row;
   std::string query_string=getenv("QUERY_STRING");
   if (query_string.length() == 0) {
-    dapError("400 Bad Request","Bad request (1)");
+    dap_error("400 Bad Request","Bad request (1)");
   }
-  convertCGICodes(query_string);
+  webutils::cgi::convert_codes(query_string);
   auto sp=strutils::split(query_string,"&");
   size_t idx;
   if ( (idx=sp[0].find(".")) != std::string::npos) {
@@ -2034,7 +2039,7 @@ int main(int argc,char **argv)
   }
   server.connect(config_data.db_host,config_data.db_username,config_data.db_password,"");
   if (!server) {
-    dapError("500 Internal Server Error","Database error main(1)");
+    dap_error("500 Internal Server Error","Database error main(1)");
   }
   if (sp.size() > 1) {
 // projections
@@ -2116,10 +2121,22 @@ int main(int argc,char **argv)
 		}
 	    }
 	  }
-	  query.set("select count(distinct g.level_code) as lcnt,any_value(l.dim_name),any_value(l.dim_size) as dsize from metautil.custom_dap_grid_index as g left join metautil.custom_dap_levels as l on l.ID = g.ID where g.ID = '"+dap_args.ID+"' and g.param = '"+pe.key+"' having lcnt = dsize");
-	  if (query.submit(server) == 0 && query.fetch_row(row)) {
-	    pe.data->level_dim.name=row[1];
-	    pe.data->level_dim.size=row[2];
+	  query.set("select dim_name,dim_size from metautil.custom_dap_level_list where ID = '"+dap_args.ID+"' and param = '"+pe.key+"'");
+	  if (query.submit(server) == 0) {
+	    if (query.num_rows() == 0) {
+		query.set("select count(distinct g.level_code) as lcnt,any_value(l.dim_name),any_value(l.dim_size) as dsize from metautil.custom_dap_grid_index as g left join metautil.custom_dap_levels as l on l.ID = g.ID where g.ID = '"+dap_args.ID+"' and g.param = '"+pe.key+"' having lcnt = dsize");
+		if (query.submit(server) == 0 && query.fetch_row(row)) {
+		  server.insert("metautil.custom_dap_level_list","'"+dap_args.ID+"','"+pe.key+"','"+row[1]+"',"+row[2]);
+		  pe.data->level_dim.name=row[1];
+		  pe.data->level_dim.size=row[2];
+		}
+	    }
+	    else {
+		if (query.fetch_row(row)) {
+		  pe.data->level_dim.name=row[0];
+		  pe.data->level_dim.size=row[1];
+		}
+	    }
 	  }
 	  projection_table.insert(pe);
 	}
@@ -2133,10 +2150,10 @@ int main(int argc,char **argv)
   query.set("select rinfo,duser from metautil.custom_dap where ID = '"+dap_args.ID+"'");
   if (query.submit(server) < 0) {
     std::cerr << "opendap main(2): " << query.error() << " for " << query.show() << std::endl;
-    dapError("500 Internal Server Error","Database error main(2)");
+    dap_error("500 Internal Server Error","Database error main(2)");
   }
   if (!query.fetch_row(row)) {
-    dapError("400 Bad Request","Dataset does not exist");
+    dap_error("400 Bad Request","Dataset does not exist");
   }
   dap_args.rinfo=row[0];
 /*
@@ -2144,26 +2161,26 @@ clock_gettime(CLOCK_REALTIME,&tp);
 std::cerr << tp.tv_sec << " " << tp.tv_nsec << std::endl;
 */
   if (dap_args.ext == ".dds") {
-    printDDS(std::cout,"text/plain","dods-dds");
+    print_DDS(std::cout,"text/plain","dods-dds");
   }
   else if (dap_args.ext == ".das") {
     if (projection_table.size() > 0) {
-	dapError("400 Bad Request","Bad request (2)");
+	dap_error("400 Bad Request","Bad request (2)");
     }
     else {
-	printDAS();
+	print_DAS();
     }
   }
   else if (dap_args.ext == ".dods" || dap_args.ext == ".ascii") {
-    outputDODS();
+    output_DODS();
   }
   else if (dap_args.ext == ".ver") {
     if (projection_table.size() > 0) {
-	dapError("400 Bad Request","Bad request (3)");
+	dap_error("400 Bad Request","Bad request (3)");
     }
     else {
 	std::cout << "Content-type: text/plain" << std::endl;
-	printDateAndVersion(std::cout);
+	print_date_and_version(std::cout);
 	std::cout << std::endl;
 	std::cout << "Core version: DAP/2.0" << std::endl;
 	std::cout << "Server version: " << config_data.version << std::endl;
@@ -2171,30 +2188,30 @@ std::cerr << tp.tv_sec << " " << tp.tv_nsec << std::endl;
   }
   else if (dap_args.ext == ".help") {
     if (projection_table.size() > 0) {
-	dapError("400 Bad Request","Bad request (4)");
+	dap_error("400 Bad Request","Bad request (4)");
     }
     else {
-	dapError("501 Not Implemented","Help is not available");
+	dap_error("501 Not Implemented","Help is not available");
     }
   }
   else if (dap_args.ext == ".info") {
     if (projection_table.size() > 0) {
-	dapError("400 Bad Request","Bad request (5)");
+	dap_error("400 Bad Request","Bad request (5)");
     }
     else {
-	printInfo();
+	print_info();
     }
   }
   else if (dap_args.ext == ".html") {
     if (projection_table.size() > 0) {
-	dapError("400 Bad Request","Bad request (6)");
+	dap_error("400 Bad Request","Bad request (6)");
     }
     else {
-	dapError("501 Not Implemented","A dataset access form is not available");
+	dap_error("501 Not Implemented","A dataset access form is not available");
     }
   }
   else {
-    dapError("400 Bad Request","Bad request (7)");
+    dap_error("400 Bad Request","Bad request (7)");
   }
   server.disconnect();
 }
