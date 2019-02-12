@@ -430,23 +430,18 @@ void showResults()
   }
   if (query_string) {
     binary_sort(array,
-    [](const DsEntry& left,const DsEntry& right) -> int
+    [](const DsEntry& left,const DsEntry& right) -> bool
     {
 	if (left.type != right.type) {
 	  if (left.type == "P") {
-	    return -1;
+	    return true;
 	  }
 	  else {
-	    return 1;
+	    return false;
 	  }
 	}
 	else {
-	  if (left.rating >= right.rating) {
-	    return -1;
-	  }
-	  else {
-	    return 1;
-	  }
+	  return (left.rating > right.rating);
 	}
     });
     std::stringstream oss,ess;
