@@ -746,18 +746,16 @@ wle.wordList="(select p.dsid as dsid, g.path as keyword from search.projects_new
     start(date_error);
   }
   else {
-    MySQL::LocalQuery query("dsid,type,title,summary","search.datasets");
+    MySQL::LocalQuery query("select d.dsid,d.type,d.title,d.summary from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS);
     if (query.submit(server) < 0) {
 	std::cout << "Location: /cgi-bin/error?code=5500&directory=/." << std::endl << std::endl;
 	exit(1);
     }
     MySQL::Row row;
     while (query.fetch_row(row)) {
-	if (row[1] != "I" && !std::regex_match(row[0],std::regex("^999.[0-9]$"))) {
-	  dataset_map[row[0]].type=row[1];
-	  dataset_map[row[0]].title=row[2];
-	  dataset_map[row[0]].summary=row[3];
-	}
+	dataset_map[row[0]].type=row[1];
+	dataset_map[row[0]].title=row[2];
+	dataset_map[row[0]].summary=row[3];
     }
 // find results containing required words
     for (const auto& item : list_of_word_lists) {
