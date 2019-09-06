@@ -377,13 +377,19 @@ void read_cache()
   }
 }
 
+void redirect_to_error()
+{
+  std::cout << "Location: /index.html?hash=error&code=404" << std::endl << std::endl;
+  exit(1);
+}
+
 void parse_query()
 {
   QueryString query_string(QueryString::GET);
   std::string sdum;
 
   if (!query_string) {
-    std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
+    redirect_to_error();
   }
   sdum=query_string.value("nb");
   if (sdum == "y") {
@@ -404,7 +410,7 @@ void parse_query()
   }
   local_args.origin=query_string.value("o");
   if (local_args.browse_by_list.size() != local_args.browse_value_list.size()) {
-    std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
+    redirect_to_error();
   }
   if (local_args.browse_by_list.size() > 1) {
     local_args.new_browse=true;
@@ -681,7 +687,7 @@ void show_refine_results()
     parse_refine_query(query);
   }
   else {
-    std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
+    redirect_to_error();
   }
 }
 
@@ -1054,7 +1060,7 @@ void browse(bool display_results = true)
   }
   else if (local_args.browse_by == "recent") {
     if (prev_results_table.size() > 0) {
-	std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
+	redirect_to_error();
     }
     else {
 	query.set("select d.dsid,d.title,d.summary,d.type,max(mssdate) as dm from dssdb.dataset as m left join search.datasets as d on concat('ds',d.dsid) = m.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and mssdate >= '"+dateutils::current_date_time().days_subtracted(60).to_string("%Y-%m-%d")+"' group by d.dsid order by d.type,dm desc");
@@ -1062,7 +1068,7 @@ void browse(bool display_results = true)
   }
   else if (local_args.browse_by == "doi") {
     if (prev_results_table.size() > 0) {
-	std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
+	redirect_to_error();
     }
     else {
 	query.set("select d.dsid,d.title,d.summary,d.type from dssdb.dsvrsn as v left join search.datasets as d on concat('ds',d.dsid) = v.dsid where v.status = 'A' and (d.type = 'P' or d.type = 'H') order by d.type,d.dsid");
@@ -1070,7 +1076,7 @@ void browse(bool display_results = true)
   }
   else if (local_args.browse_by == "all") {
     if (prev_results_table.size() > 0) {
-	std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
+	redirect_to_error();
     }
     else {
 	query.set("select dsid,title,summary,type from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS+" order by type,dsid");
@@ -1080,7 +1086,7 @@ void browse(bool display_results = true)
     parse_browse_query(query,num_entries,display_results);
   }
   else {
-    std::cout << "Location: /cgi-bin/error?code=404" << std::endl << std::endl;
+    redirect_to_error();
   }
 }
 
@@ -1715,7 +1721,7 @@ int main(int argc,char **argv)
   }
   else if (local_args.browse_by_list.size() > 0) {
     if (local_args.browse_by_list.size() != local_args.browse_value_list.size()) {
-	std::cout << "Location: /index.html?hash=error&code=404" << std::endl << std::endl;
+	redirect_to_error();
     }
     else {
 	auto n=0;
@@ -1747,6 +1753,6 @@ int main(int argc,char **argv)
     show_start();
   }
   else {
-    std::cout << "Location: /index.html?hash=error&code=404" << std::endl << std::endl;
+    redirect_to_error();
   }
 }
