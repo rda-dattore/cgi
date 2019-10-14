@@ -96,7 +96,7 @@ struct GridCoverages {
   std::list<std::string> coverages;
   pthread_t tid;
 };
-const std::string INDEXABLE_DATASET_CONDITIONS="(d.type = 'P' or d.type = 'H') and d.dsid != '999.8' and d.dsid != '999.9'";
+const std::string INDEXABLE_DATASET_CONDITIONS="(d.type = 'P' or d.type = 'H') and d.dsid < '999.0'";
 
 bool compare_strings(std::string& left,std::string& right)
 {
