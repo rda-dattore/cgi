@@ -800,7 +800,7 @@ void add_breadcrumbs(size_t num_results)
   }
 }
 
-void show_datasets_after_processing(MySQL::LocalQuery& query,int num_entries,bool display_results)
+void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entries,bool display_results)
 {
   MySQL::Row row;
   std::string sdum;
@@ -810,7 +810,7 @@ void show_datasets_after_processing(MySQL::LocalQuery& query,int num_entries,boo
   my::map<CountEntry> multi_table;
   CountEntry ce;
 
-  while (query.fetch_row(row)) {
+  while (pstmt.fetch_row(row)) {
     if (prev_results_table.found(row[0],dse)) {
 	if (num_entries < 2) {
 	  ++num_results;
@@ -837,8 +837,8 @@ void show_datasets_after_processing(MySQL::LocalQuery& query,int num_entries,boo
     std::cout << "<form name=\"compare\" action=\"javascript:void(0)\" method=\"get\">" << std::endl;
     add_breadcrumbs(num_results);
   }
-  query.rewind();
-  while (query.fetch_row(row)) {
+  pstmt.rewind();
+  while (pstmt.fetch_row(row)) {
     ce.key="";
     if (prev_results_table.found(row[0],dse) && (num_entries < 2 || (multi_table.found(row[0],ce) && (*ce.count) == static_cast<int>(num_entries)))) {
 	if (!ce.key.empty()) {
@@ -868,7 +868,7 @@ void show_datasets_after_processing(MySQL::LocalQuery& query,int num_entries,boo
   }
 }
 
-void show_datasets_from_query(MySQL::LocalQuery& query,bool display_results)
+void show_datasets_from_query(MySQL::PreparedStatement& pstmt,bool display_results)
 {
   MySQL::Row row;
   std::string sdum;
@@ -876,14 +876,14 @@ void show_datasets_from_query(MySQL::LocalQuery& query,bool display_results)
   size_t iterator;
 
   open_cache_for_writing();
-  cache << "@" << local_args.url_input.browse_by << "<!>" << local_args.url_input.browse_value << "<!>" << query.num_rows() << std::endl;
+  cache << "@" << local_args.url_input.browse_by << "<!>" << local_args.url_input.browse_value << "<!>" << pstmt.num_rows() << std::endl;
   if (display_results) {
     std::cout << "Content-type: text/html" << std::endl << std::endl;
     std::cout << "<span class=\"fs24px bold\">Browse the RDA</span><br>" << std::endl;
     std::cout << "<form name=\"compare\" action=\"javascript:void(0)\">" << std::endl;
-    add_breadcrumbs(query.num_rows());
+    add_breadcrumbs(pstmt.num_rows());
   }
-  while (query.fetch_row(row)) {
+  while (pstmt.fetch_row(row)) {
     cache << row[0] << std::endl;
     if (display_results) {
 	sdum=strutils::itos(n+1);
@@ -891,7 +891,7 @@ void show_datasets_from_query(MySQL::LocalQuery& query,bool display_results)
 	if (row[3] == "H") {
 	  std::cout << "<img src=\"/images/alert.gif\">&nbsp;<span style=\"color: red\">For ancillary use only - not recommended as a primary research dataset.  It has likely been superseded by newer and better datasets.</span><br>";
 	}
-	if (query.num_rows() > 1) {
+	if (pstmt.num_rows() > 1) {
 	  std::cout << "<input type=\"checkbox\" name=\"cmp\" value=\""+row[0]+"\">&nbsp;";
 	}
 	std::cout << sdum+". <a class=\"underline\" href=\"/datasets/ds"+row[0]+"/\" target=\"_blank\" itemprop=\"url\"><b itemprop=\"name\">"+row[1]+"</b></a> <span class=\"mediumGrayText\">(ds"+row[0]+")</span><br>" << std::endl;
@@ -906,160 +906,186 @@ void show_datasets_from_query(MySQL::LocalQuery& query,bool display_results)
   close_cache();
 }
 
-void parse_browse_query(MySQL::LocalQuery& query,int num_entries,bool display_results)
+void parse_browse_query(MySQL::PreparedStatement& pstmt,int num_entries,bool display_results)
 {
   bgcolors[0]="#ffffff";
   bgcolors[1]="#f8fcff";
   metautils::read_config("lookfordata","","");
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  if (query.submit(server) == 0) {
+  if (pstmt.submit(server) == 0) {
     if (prev_results_table.size() > 0) {
-	show_datasets_after_processing(query,num_entries,display_results);
+	show_datasets_after_processing(pstmt,num_entries,display_results);
     }
     else {
-	show_datasets_from_query(query,display_results);
+	show_datasets_from_query(pstmt,display_results);
     }
   }
   else {
-    std::cerr << "LOOKFORDATA query failed with error " << query.error() << ": '" << query.show() << "'" << std::endl;
+    std::cerr << "LOOKFORDATA query failed with error " << pstmt.error() << ": '" << pstmt.show() << "'" << std::endl;
   }
   server.disconnect();
 }
 
 void browse(bool display_results = true)
 {
-  MySQL::LocalQuery query;
-  std::string sdum,sword;
-  std::deque<std::string> sp;
-  size_t n;
-  std::string include_words,exclude_words;
   int num_entries=0;
-  bool ignore;
-
+  MySQL::PreparedStatement pstmt;
+  std::vector<std::tuple<enum_field_types,std::string>> binds;
   if (local_args.url_input.browse_by == "var") {
-    query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword left join search.datasets as d on d.dsid = v.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.path like '% > "+local_args.url_input.browse_value+"' group by d.dsid order by d.type,trank");
+    pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword left join search.datasets as d on d.dsid = v.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.path like concat('% > ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING});
+    binds.emplace_back(MYSQL_TYPE_STRING,local_args.url_input.browse_value);
   }
   else if (local_args.url_input.browse_by == "tres") {
     if (local_args.url_input.browse_value == "Not specified") {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.time_resolutions as r on r.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(r.keyword) group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.time_resolutions as r on r.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(r.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{});
     }
     else {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.time_resolutions as r left join search.datasets as d on d.dsid = r.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and r.keyword = 'T : "+strutils::substitute(local_args.url_input.browse_value," to "," - ")+"' group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.time_resolutions as r left join search.datasets as d on d.dsid = r.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and r.keyword = concat('T : ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING});
+	binds.emplace_back(MYSQL_TYPE_STRING,strutils::substitute(local_args.url_input.browse_value," to "," - "));
     }
   }
   else if (local_args.url_input.browse_by == "plat") {
     if (local_args.url_input.browse_value == "Not specified") {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.platforms_new as p on p.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(p.keyword) group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.platforms_new as p on p.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(p.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{});
     }
     else {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.platforms_new as p left join search.GCMD_platforms as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = '"+local_args.url_input.browse_value+"' or g.path like '% > "+local_args.url_input.browse_value+"') group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.platforms_new as p left join search.GCMD_platforms as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?)) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING,MYSQL_TYPE_STRING});
+	binds.emplace_back(MYSQL_TYPE_STRING,local_args.url_input.browse_value);
+	binds.emplace_back(MYSQL_TYPE_STRING,local_args.url_input.browse_value);
     }
   }
   else if (local_args.url_input.browse_by == "sres") {
     if (local_args.url_input.browse_value == "Not specified") {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.grid_resolutions as g on g.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(g.keyword) group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.grid_resolutions as g on g.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(g.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{});
     }
     else {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.grid_resolutions as g left join search.datasets as d on d.dsid = g.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.keyword = 'H : "+strutils::substitute(local_args.url_input.browse_value," to "," - ")+"' group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.grid_resolutions as g left join search.datasets as d on d.dsid = g.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.keyword = concat('H : ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING});
+	binds.emplace_back(MYSQL_TYPE_STRING,strutils::substitute(local_args.url_input.browse_value," to "," - "));
     }
   }
   else if (local_args.url_input.browse_by == "topic") {
-    sp=strutils::split(local_args.url_input.browse_value," > ");
-    sdum="v.topic = '"+sp[0]+"'";
-    if (sp.size() > 1) {
-	sdum+=" and v.term = '"+sp[1]+"'";
+    auto parts=strutils::split(local_args.url_input.browse_value," > ");
+    auto topic_condition="v.topic = '"+parts[0]+"'";
+    if (parts.size() > 1) {
+	topic_condition+=" and v.term = '"+parts[1]+"'";
     }
-    query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.GCMD_variables as v left join search.datasets as d on d.dsid = v.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and "+sdum+" group by d.dsid order by d.type,trank");
+    pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.GCMD_variables as v left join search.datasets as d on d.dsid = v.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and "+topic_condition+" group by d.dsid order by d.type,trank",std::vector<enum_field_types>{});
   }
   else if (local_args.url_input.browse_by == "proj") {
     if (local_args.url_input.browse_value == "Not specified") {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.projects_new as p on p.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(p.keyword) group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.projects_new as p on p.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(p.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{});
     }
     else {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.projects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = '"+local_args.url_input.browse_value+"' or g.path like '% > "+local_args.url_input.browse_value+"') group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.projects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?)) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING,MYSQL_TYPE_STRING});
+	binds.emplace_back(MYSQL_TYPE_STRING,local_args.url_input.browse_value);
+	binds.emplace_back(MYSQL_TYPE_STRING,local_args.url_input.browse_value);
     }
   }
   else if (local_args.url_input.browse_by == "type") {
     if (local_args.url_input.browse_value == "Not specified") {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.data_types as y on y.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(y.keyword) group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.data_types as y on y.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(y.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{});
     }
     else {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.data_types as y on y.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and y.keyword = '"+local_args.url_input.browse_value+"' group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.data_types as y on y.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and y.keyword = ? group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING});
+	binds.emplace_back(MYSQL_TYPE_STRING,local_args.url_input.browse_value);
     }
   }
   else if (local_args.url_input.browse_by == "supp") {
     if (local_args.url_input.browse_value == "Not specified") {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.supportedProjects_new as s on s.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(s.keyword) group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.supportedProjects_new as s on s.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(s.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{});
     }
     else {
+	std::vector<enum_field_types> parameter_types;
 	std::string qspec="select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = '"+local_args.url_input.browse_value+"' or g.path like '% > "+local_args.url_input.browse_value+"')";
+	std::string pstmt_spec="select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?))";
+	binds.emplace_back(MYSQL_TYPE_STRING,local_args.url_input.browse_value);
+	parameter_types.emplace_back(MYSQL_TYPE_STRING);
+	binds.emplace_back(MYSQL_TYPE_STRING,local_args.url_input.browse_value);
+	parameter_types.emplace_back(MYSQL_TYPE_STRING);
 	if (!local_args.url_input.origin.empty()) {
-	  qspec+=" and p.origin = '"+local_args.url_input.origin+"'";
+	  pstmt_spec+=" and p.origin = ?";
+	  binds.emplace_back(MYSQL_TYPE_STRING,local_args.url_input.origin);
+	  parameter_types.emplace_back(MYSQL_TYPE_STRING);
 	}
-	qspec+=" group by d.dsid order by d.type,trank";
-	query.set(qspec);
+	pstmt_spec+=" group by d.dsid order by d.type,trank";
+	pstmt.set(pstmt_spec,parameter_types);
     }
   }
   else if (local_args.url_input.browse_by == "fmt") {
     if (local_args.url_input.browse_value == "Not specified") {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.formats as f on f.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(f.keyword) group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.formats as f on f.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(f.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{});
     }
     else {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.formats as f left join search.datasets as d on d.dsid = f.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and f.keyword = '"+local_args.url_input.browse_value+"' group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.formats as f left join search.datasets as d on d.dsid = f.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and f.keyword = ? group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING});
+	binds.emplace_back(MYSQL_TYPE_STRING,local_args.url_input.browse_value);
     }
   }
   else if (local_args.url_input.browse_by == "instr") {
     if (local_args.url_input.browse_value == "Not specified") {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.instruments_new as i on i.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(i.keyword) group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.instruments_new as i on i.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(i.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{});
     }
     else {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.instruments_new as i left join search.GCMD_instruments as g on g.uuid = i.keyword left join search.datasets as d on d.dsid = i.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.last_in_path = '"+local_args.url_input.browse_value+"' group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.instruments_new as i left join search.GCMD_instruments as g on g.uuid = i.keyword left join search.datasets as d on d.dsid = i.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.last_in_path = ? group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING});
+	binds.emplace_back(MYSQL_TYPE_STRING,local_args.url_input.browse_value);
     }
   }
   else if (local_args.url_input.browse_by == "loc") {
     if (local_args.url_input.browse_value == "Not specified") {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.locations as l on l.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(l.keyword) group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.locations as l on l.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(l.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{});
     }
     else {
-	sdum=strutils::substitute(local_args.url_input.browse_value,"USA","United States Of America");
-	strutils::replace_all(sdum,"'","\\'");
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.locations as l left join search.datasets as d on d.dsid = l.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and l.keyword like '% > "+sdum+"' group by d.dsid order by d.type,trank");
+	auto keyword=strutils::substitute(local_args.url_input.browse_value,"USA","United States Of America");
+	strutils::replace_all(keyword,"'","\\'");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.locations as l left join search.datasets as d on d.dsid = l.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and l.keyword like concat('% > ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING});
+	binds.emplace_back(MYSQL_TYPE_STRING,keyword);
     }
   }
   else if (local_args.url_input.browse_by == "prog") {
     if (local_args.url_input.browse_value == "Complete") {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and d.continuing_update = 'N' group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and d.continuing_update = 'N' group by d.dsid order by d.type,trank",std::vector<enum_field_types>{});
     }
     else if (local_args.url_input.browse_value == "Continually Updated") {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and d.continuing_update = 'Y' group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and d.continuing_update = 'Y' group by d.dsid order by d.type,trank",std::vector<enum_field_types>{});
     }
   }
   else if (local_args.url_input.browse_by == "ftext") {
-    sp=strutils::split(local_args.url_input.browse_value);
-    for (n=0; n < sp.size(); ++n) {
-	if (sp[n].front() == '-') {
+    auto parts=strutils::split(local_args.url_input.browse_value);
+    std::string include_words,exclude_words;
+    for (size_t n=0; n < parts.size(); ++n) {
+	if (parts[n].front() == '-') {
 	  if (!exclude_words.empty()) {
 	    exclude_words+=" or ";
 	  }
-	  exclude_words+="word = '"+sp[n].substr(1)+"'";
+	  exclude_words+="word = ?";
+	  binds.emplace_back(MYSQL_TYPE_STRING,parts[n].substr(1));
 	}
 	else {
-	  sdum=sp[n];
-	  sword=searchutils::cleaned_search_word(sdum,ignore);
+	  auto word=parts[n];
+	  bool ignore;
+	  auto sword=searchutils::cleaned_search_word(word,ignore);
 	  if (!include_words.empty()) {
 	    include_words+=" or ";
 	  }
-	  include_words+="word = '"+sdum+"' or (word like '"+sword+"' and sword = '"+strutils::soundex(sword)+"')";
+	  include_words+="word = ? or (word like ? and sword = ?)";
+	  for (size_t m=0; m < 2; ++m) {
+	    binds.emplace_back(MYSQL_TYPE_STRING,word);
+	    binds.emplace_back(MYSQL_TYPE_STRING,sword);
+	    binds.emplace_back(MYSQL_TYPE_STRING,strutils::soundex(sword));
+	  }
 	  num_entries++;
 	}
+    }
+    std::vector<enum_field_types> parameter_types;
+    for (const auto& t : binds) {
+	parameter_types.emplace_back(std::get<0>(t));
     }
     if (!include_words.empty() && !exclude_words.empty()) {
     }
     else if (!include_words.empty()) {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank,word from (select dsid,word from search.title_wordlist where "+include_words+" union select dsid,word from search.summary_wordlist where "+include_words+") as u left join search.datasets as d on d.dsid = u.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" group by d.dsid,word order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank,word from (select dsid,word from search.title_wordlist where "+include_words+" union select dsid,word from search.summary_wordlist where "+include_words+") as u left join search.datasets as d on d.dsid = u.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" group by d.dsid,word order by d.type,trank",parameter_types);
     }
     else {
-	query.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join (select dsid from search.title_wordlist where "+exclude_words+" union select dsid from search.summary_wordlist where "+exclude_words+") as u on u.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(u.dsid) group by d.dsid order by d.type,trank");
+	pstmt.set("select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join (select dsid from search.title_wordlist where "+exclude_words+" union select dsid from search.summary_wordlist where "+exclude_words+") as u on u.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(u.dsid) group by d.dsid order by d.type,trank",parameter_types);
     }
   }
   else if (local_args.url_input.browse_by == "recent") {
@@ -1067,7 +1093,7 @@ void browse(bool display_results = true)
 	redirect_to_error();
     }
     else {
-	query.set("select d.dsid,d.title,d.summary,d.type,max(mssdate) as dm from dssdb.dataset as m left join search.datasets as d on concat('ds',d.dsid) = m.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and mssdate >= '"+dateutils::current_date_time().days_subtracted(60).to_string("%Y-%m-%d")+"' group by d.dsid order by d.type,dm desc");
+	pstmt.set("select d.dsid,d.title,d.summary,d.type,max(mssdate) as dm from dssdb.dataset as m left join search.datasets as d on concat('ds',d.dsid) = m.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and mssdate >= '"+dateutils::current_date_time().days_subtracted(60).to_string("%Y-%m-%d")+"' group by d.dsid order by d.type,dm desc",std::vector<enum_field_types>{});
     }
   }
   else if (local_args.url_input.browse_by == "doi") {
@@ -1075,7 +1101,7 @@ void browse(bool display_results = true)
 	redirect_to_error();
     }
     else {
-	query.set("select d.dsid,d.title,d.summary,d.type from dssdb.dsvrsn as v left join search.datasets as d on concat('ds',d.dsid) = v.dsid where v.status = 'A' and (d.type = 'P' or d.type = 'H') order by d.type,d.dsid");
+	pstmt.set("select d.dsid,d.title,d.summary,d.type from dssdb.dsvrsn as v left join search.datasets as d on concat('ds',d.dsid) = v.dsid where v.status = 'A' and (d.type = 'P' or d.type = 'H') order by d.type,d.dsid",std::vector<enum_field_types>{});
     }
   }
   else if (local_args.url_input.browse_by == "all") {
@@ -1083,11 +1109,33 @@ void browse(bool display_results = true)
 	redirect_to_error();
     }
     else {
-	query.set("select dsid,title,summary,type from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS+" order by type,dsid");
+	pstmt.set("select dsid,title,summary,type from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS+" order by type,dsid",std::vector<enum_field_types>{});
     }
   }
-  if (query) {
-    parse_browse_query(query,num_entries,display_results);
+  if (pstmt) {
+    for (size_t n=0; n < binds.size(); ++n) {
+	auto bind_successful=false;
+	switch (std::get<0>(binds[n])) {
+	  case MYSQL_TYPE_STRING: {
+	    bind_successful=pstmt.bind_parameter(n,std::get<1>(binds[n]),false);
+	    break;
+	  }
+	  case MYSQL_TYPE_LONG: {
+	    bind_successful=pstmt.bind_parameter(n,std::stoi(std::get<1>(binds[n])),false);
+	    break;
+	  }
+	  case MYSQL_TYPE_FLOAT: {
+	    bind_successful=pstmt.bind_parameter(n,std::stof(std::get<1>(binds[n])),false);
+	    break;
+	  }
+	  default: {}
+	}
+	if (!bind_successful) {
+	  std::cerr << "LOOKFORDATA bind(" << n << ") failed - '" << pstmt.error() << "', prepared statement: '" << pstmt.show() << "'" << std::endl;
+	  web_error("parameter bind error");
+	}
+    }
+    parse_browse_query(pstmt,num_entries,display_results);
   }
   else {
     redirect_to_error();
