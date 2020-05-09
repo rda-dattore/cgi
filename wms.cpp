@@ -53,9 +53,11 @@ auto is_dev=false;
 
 const double PI=3.141592653589793;
 const double TWO_PI=2.*PI;
+const double E=2.71828;
 
 void print_exception_report(std::string exception_text,std::string exception_code = "",std::string locator = "")
 {
+  std::cerr << "WMS EXCEPTION: " << exception_text << std::endl;
   std::cout << "Content-type: application/xml" << std::endl << std::endl;
   TokenDocument tdoc("/usr/local/www/server_root/web/html/wms/exception.xml");
   if (!exception_code.empty()) {
@@ -116,9 +118,6 @@ void fill_querystring(QueryString& query_string)
   }
   if (request.empty()) {
     print_exception_report("A value for the parameter 'REQUEST' is required","MissingParameterValue","REQUEST");
-  }
-  if (query_string.value("dev") == "y") {
-    is_dev=true;
   }
 }
 void fill_data_value_range(std::unique_ptr<char[]>& buffer,std::string format,double &min,double &max)
@@ -214,6 +213,11 @@ std::string build_layer_cache(std::string layer_name)
 		overall_max=max;
 	    }
 	    cache_ss << row[2] << "," << row[0] << "," << row[1] << std::endl;
+	  }
+	  if (overall_min < 0. && overall_max > 0.) {
+	    if ( (-overall_min/overall_max) < 0.02) {
+		overall_min=0.;
+	    }
 	  }
 	  std::ofstream ofs(cache_file.c_str());
 	  if (!ofs.is_open()) {
@@ -674,11 +678,11 @@ void output_capabilities(const QueryString& query_string)
   std::cout << capabilities_ss.str();
 }
 
-size_t num_colors(std::string color_map)
+size_t color_map_size(std::string color_map)
 {
   std::stringstream oss,ess;
   if (unixutils::mysystem2("/bin/tcsh -c \"head -1 /usr/local/www/server_root/web/html/wms/"+color_map+".colormap |awk -F= '{print $2}'\"",oss,ess) < 0) {
-    print_exception_report("There was an error reading the color map");
+    print_exception_report("There was an error reading the color map: '"+ess.str()+"'");
   }
   size_t num_colors=std::stoi(oss.str());
   if (num_colors > 254) {
@@ -689,12 +693,230 @@ size_t num_colors(std::string color_map)
 
 std::vector<double> precipitation_contours()
 {
-  return std::vector<double>{0.0254,2.54,6.35,12.7,19.05,25.4,31.75,38.1,44.45,50.8,63.5,76.2,88.9,101.6,127.,177.8,254.,381.,508.};
+  return std::move(std::vector<double>{0.254,2.54,6.35,12.7,19.05,25.4,31.75,38.1,44.45,50.8,63.5,76.2,88.9,101.6,127.,177.8,254.,381.,508.});
 }
 
-std::vector<std::string> precipitation_contour_flags()
+std::vector<unsigned char> precipitation_contour_types()
 {
-  return std::vector<std::string>{"LineOnly","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel","LineAndLabel"};
+  return std::move(std::vector<unsigned char>{0x2,0x1,0x2,0x1,0x2,0x1,0x2,0x2,0x2,0x1,0x2,0x2,0x2,0x1,0x2,0x2,0x1,0x2,0x1});
+}
+
+double y_to_latitude(std::string projection,double y,double semi_major_axis)
+{
+  double latitude=0.;
+  if (projection == "Mercator") {
+     latitude=(360/PI)*(atan(pow(E,y/semi_major_axis))-(PI/4));
+  }
+  return latitude;
+}
+
+void get_contours_from_data(double data_min,double data_max,std::string color_map,int first_color_index,double central_value,std::vector<double>& levels,std::vector<short>& fill_colors,std::vector<unsigned char>& types,std::vector<short>& dash_patterns)
+{
+  if (central_value != 1.e18) {
+    auto right_range=data_max-central_value;
+    auto left_range=central_value-data_min;
+    if (right_range > left_range) {
+	data_min=central_value-right_range;
+    }
+    else {
+	data_max=central_value+left_range;
+    }
+  }
+// aim for 10 to 20 major (labeled) contours
+  auto num_filled_contours=color_map_size(color_map)-first_color_index;
+  size_t major_contour_count=0;
+  for (size_t n=20; n >= 10; --n) {
+    if ( (num_filled_contours % n) == 0) {
+	major_contour_count=n;
+	break;
+    }
+  }
+  if (major_contour_count == 0) {
+    major_contour_count=15;
+    --num_filled_contours;
+    while (num_filled_contours > 0 && (num_filled_contours % 15) != 0) {
+	--num_filled_contours;
+    }
+  }
+  auto minor_contour_count=num_filled_contours/major_contour_count;
+  auto contour_increment=(data_max-data_min)/major_contour_count;
+  auto fill_color_index=first_color_index;
+  auto vector_size=major_contour_count*minor_contour_count;
+  levels.clear();
+  levels.reserve(vector_size);
+  fill_colors.clear();
+  fill_colors.reserve(vector_size);
+  types.clear();
+  types.reserve(vector_size);
+  dash_patterns.clear();
+  dash_patterns.reserve(vector_size);
+  for (size_t n=0; n < major_contour_count; ++n) {
+    levels.emplace_back(n*contour_increment+data_min);
+    fill_colors.emplace_back(fill_color_index++);
+    types.emplace_back(0x1);
+    if (central_value != 1.e18) {
+	if (levels.back() <= central_value) {
+	  dash_patterns.emplace_back(5);
+	}
+	else {
+	  dash_patterns.emplace_back(0);
+	}
+    }
+    for (size_t m=1; m < minor_contour_count; ++m) {
+	levels.emplace_back(contour_increment*(n+static_cast<double>(m)/minor_contour_count)+data_min);
+	fill_colors.emplace_back(fill_color_index++);
+	types.emplace_back(0x2);
+	if (central_value != 1.e18) {
+	  if (levels.back() <= central_value) {
+	    dash_patterns.emplace_back(5);
+	  }
+	  else {
+	    dash_patterns.emplace_back(0);
+	  }
+	}
+    }
+  }
+// pad the contours so the legend displays properly
+  levels.emplace_back(levels.back());
+  levels.emplace_back(levels.back());
+  fill_colors.emplace_back(fill_colors.back());
+  fill_colors.emplace_back(fill_colors.back());
+  types.emplace_back(0x2);
+  types.emplace_back(0x2);
+  dash_patterns.emplace_back(0);
+  dash_patterns.emplace_back(0);
+}
+
+void set_contours_from_specified_values(const std::vector<double>& specified_contour_levels,const std::vector<unsigned char>& specified_contour_level_types,std::string color_map,size_t first_color_index,TokenDocument& tdoc)
+{
+  tdoc.add_if("__SPECIFIED_CONTOUR_LEVELS__");
+  auto data_range=specified_contour_levels.back()-specified_contour_levels.front();
+  auto label_precision=2;
+  while (label_precision < 5 && data_range < 1.) {
+    ++label_precision;
+    data_range*=10.;
+  }
+  auto num_colors=color_map_size(color_map)-first_color_index+1; 
+  auto num_minor_levels=(num_colors-1)/specified_contour_levels.size();
+  std::stringstream contours_ss,fill_colors_ss,flags_ss;
+  if (label_precision < 5) {
+    contours_ss.setf(std::ios::fixed);
+    contours_ss.precision(label_precision);
+  }
+  else {
+    contours_ss.setf(std::ios::scientific);
+    contours_ss.precision(3);
+  }
+  for (size_t n=0; n < specified_contour_levels.size()-1; ++n) {
+    if (!contours_ss.str().empty()) {
+	contours_ss << ",";
+    }
+    contours_ss << specified_contour_levels[n];
+    if (!fill_colors_ss.str().empty()) {
+	fill_colors_ss << ",";
+    }
+    fill_colors_ss << first_color_index++;
+    if (!flags_ss.str().empty()) {
+	flags_ss << ",";
+    }
+    if (specified_contour_level_types[n] == 0x1) {
+	flags_ss << "\"LineAndLabel\"";
+    }
+    else {
+	flags_ss << "\"NoLine\"";
+    }
+    for (size_t m=1; m <= num_minor_levels; ++m) {
+	auto minor_diff=(specified_contour_levels[n+1]-specified_contour_levels[n])/(num_minor_levels+1);
+	if (!contours_ss.str().empty()) {
+	  contours_ss << ",";
+	}
+	contours_ss << specified_contour_levels[n]+m*minor_diff;
+	if (!fill_colors_ss.str().empty()) {
+	  fill_colors_ss << ",";
+	}
+	fill_colors_ss << first_color_index++;
+	if (!flags_ss.str().empty()) {
+	  flags_ss << ",";
+	}
+	flags_ss << "\"NoLine\"";
+    }
+  }
+  contours_ss << "," << specified_contour_levels.back();
+  fill_colors_ss << "," << first_color_index;
+  if (specified_contour_level_types.back() == 0x1) {
+    flags_ss << ",\"LineAndLabel\"";
+  }
+  else {
+    flags_ss << ",\"NoLine\"";
+  }
+  tdoc.add_replacement("__SPECIFIED_CONTOUR_LEVELS__",contours_ss.str());
+  tdoc.add_replacement("__SPECIFIED_CONTOUR_FILL_COLORS__",fill_colors_ss.str());
+  tdoc.add_replacement("__SPECIFIED_CONTOUR_LEVEL_FLAGS__",flags_ss.str());
+}
+
+void set_contours_from_data(double data_min,double data_max,std::string color_map,size_t first_color_index,double central_value,TokenDocument& tdoc)
+// set first_color_index to 1 if the first filled contour should be the
+//   background color
+{
+  tdoc.add_if("__SPECIFIED_CONTOUR_LEVELS__");
+  auto data_range=data_max-data_min;
+  auto label_precision=2;
+  while (label_precision < 5 && data_range < 1.) {
+    ++label_precision;
+    data_range*=10.;
+  }
+  std::vector<double> contour_levels;
+  std::vector<short> contour_fill_colors,contour_dash_patterns;
+  std::vector<unsigned char> contour_types;
+  get_contours_from_data(data_min,data_max,color_map,first_color_index,central_value,contour_levels,contour_fill_colors,contour_types,contour_dash_patterns);
+  std::stringstream contours_ss;
+  if (label_precision < 5) {
+    contours_ss.setf(std::ios::fixed);
+    contours_ss.precision(label_precision);
+  }
+  else {
+    contours_ss.setf(std::ios::scientific);
+    contours_ss.precision(3);
+  }
+  for (const auto& contour_level : contour_levels) {
+    if (!contours_ss.str().empty()) {
+	contours_ss << ",";
+    }
+    contours_ss << contour_level;
+  }
+  tdoc.add_replacement("__SPECIFIED_CONTOUR_LEVELS__",contours_ss.str());
+  std::stringstream fill_colors_ss;
+  for (const auto& fill_color : contour_fill_colors) {
+    if (!fill_colors_ss.str().empty()) {
+	fill_colors_ss << ",";
+    }
+    fill_colors_ss << fill_color;
+  }
+  tdoc.add_replacement("__SPECIFIED_CONTOUR_FILL_COLORS__",fill_colors_ss.str());
+  std::stringstream flags_ss;
+  for (const auto& contour_type : contour_types) {
+    if (!flags_ss.str().empty()) {
+	flags_ss << ",";
+    }
+    if (contour_type == 0x1) {
+	flags_ss << "\"LineAndLabel\"";
+    }
+    else {
+	flags_ss << "\"NoLine\"";
+    }
+  }
+  tdoc.add_replacement("__SPECIFIED_CONTOUR_LEVEL_FLAGS__",flags_ss.str());
+  if (central_value != 1.e18) {
+    tdoc.add_if("__SPECIFIED_CONTOUR_LINE_DASH_PATTERNS__");
+    std::stringstream dash_ss;
+    for (const auto& dash_pattern : contour_dash_patterns) {
+	if (!dash_ss.str().empty()) {
+	  dash_ss << ",";
+	}
+	dash_ss << dash_pattern;
+    }
+    tdoc.add_replacement("__SPECIFIED_CONTOUR_LINE_DASH_PATTERNS__",dash_ss.str());
+  }
 }
 
 void output_map(const MapParameters& mp)
@@ -718,6 +940,12 @@ void output_map(const MapParameters& mp)
   ofs.close();
   TokenDocument tdoc("/usr/local/www/server_root/web/html/wms/grib2.ncl");
   tdoc.add_replacement("__INFILE__",tdir_name+"/infile.grb2");
+  if (is_dev) {
+    tdoc.add_replacement("__OUTLINE_BOUNDARY_SETS__","AllBoundaries");
+  }
+  else {
+    tdoc.add_replacement("__OUTLINE_BOUNDARY_SETS__","NoBoundaries");
+  }
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (!server) {
     print_exception_report("A database error occurred (output_map)");
@@ -746,8 +974,12 @@ void output_map(const MapParameters& mp)
   }
   tdoc.add_replacement("__OUTFILE__",tdir_name+"/outfile."+image_formats[mp.format]);
   auto bbox_parts=strutils::split(mp.bbox,",");
-  if (std::get<1>(coordinate_reference_systems[mp.crs]) == 0.) {
-    switch (std::get<2>(coordinate_reference_systems[mp.crs])) {
+  std::string projection;
+  double semi_major_axis;
+  unsigned char flag;
+  std::tie(projection,semi_major_axis,flag)=coordinate_reference_systems[mp.crs];
+  if (semi_major_axis == 0.) {
+    switch (flag) {
 	case 0x1: {
 	  tdoc.add_replacement("__MIN_LAT__",strutils::dtos(std::stod(bbox_parts[0]),4));
 	  tdoc.add_replacement("__MIN_LON__",strutils::dtos(std::stod(bbox_parts[1]),4));
@@ -764,125 +996,42 @@ void output_map(const MapParameters& mp)
     }
   }
   else {
-    const double METERS_PER_DEGREE=TWO_PI*std::get<1>(coordinate_reference_systems[mp.crs])/360.;
-    tdoc.add_replacement("__MIN_LON__",strutils::dtos(std::stod(bbox_parts[0])/METERS_PER_DEGREE,4));
-    tdoc.add_replacement("__MIN_LAT__",strutils::dtos(std::stod(bbox_parts[1])/METERS_PER_DEGREE,4));
-    tdoc.add_replacement("__MAX_LON__",strutils::dtos(std::stod(bbox_parts[2])/METERS_PER_DEGREE,4));
-    tdoc.add_replacement("__MAX_LAT__",strutils::dtos(std::stod(bbox_parts[3])/METERS_PER_DEGREE,4));
+    const double LON_METERS_PER_DEGREE=TWO_PI*semi_major_axis/360.;
+    tdoc.add_replacement("__MIN_LON__",strutils::dtos(std::stod(bbox_parts[0])/LON_METERS_PER_DEGREE,4));
+    tdoc.add_replacement("__MAX_LON__",strutils::dtos(std::stod(bbox_parts[2])/LON_METERS_PER_DEGREE,4));
+    tdoc.add_replacement("__MIN_LAT__",strutils::dtos(y_to_latitude(projection,std::stod(bbox_parts[1]),semi_major_axis),4));
+    tdoc.add_replacement("__MAX_LAT__",strutils::dtos(y_to_latitude(projection,std::stod(bbox_parts[3]),semi_major_axis),4));
   }
-  std::string color_map;
+  std::unique_ptr<std::vector<double>> specified_contour_levels(nullptr);
+  std::unique_ptr<std::vector<unsigned char>> specified_contour_level_types(nullptr);
+  std::string color_map="NCV_bright";
+  size_t first_color_index=2;
+  double central_value=1.e18;
   auto param=lparts[3].substr(lparts[3].find(":")+1);
-  if (std::regex_search(param,std::regex("^0\\.0\\.[045]"))) {
-// temperature
-    tdoc.add_if("__SPECIFIED_CONTOUR_LEVELS__");
-    color_map="NCV_bright";
-    const double ZERO_VALUE=273.15;
-    const size_t LINE_INTERVAL=5;
-    double p_range=cdata.data_max-ZERO_VALUE;
-    double range=cdata.data_max-cdata.data_min;
-    double p_ratio=p_range/range;
-    double num_p_colors=lround(p_ratio*num_colors(color_map));
-    double c_interval=p_range/num_p_colors;
-    double num_contours=floor(LINE_INTERVAL/c_interval);
-    c_interval=LINE_INTERVAL/num_contours;
-    std::deque<double> c_levels;
-    std::deque<std::string> c_flags,l_dash_patterns;
-    for (double x=ZERO_VALUE-c_interval; x > cdata.data_min; x-=c_interval) {
-	c_levels.emplace_front(x);
-	double xdiff=ZERO_VALUE-x;
-	int i=lround(xdiff);
-	if (floatutils::myequalf(xdiff,i,0.001) && (i % LINE_INTERVAL) == 0) {
-	  c_flags.emplace_front("LineAndLabel");
-	}
-	else {
-	  c_flags.emplace_front("NoLine");
-	}
-	l_dash_patterns.emplace_front("5");
-    }
-    for (double x=ZERO_VALUE; x < cdata.data_max; x+=c_interval) {
-	c_levels.emplace_back(x);
-	double xdiff=x-ZERO_VALUE;
-	int i=lround(xdiff);
-	if (floatutils::myequalf(xdiff,i,0.001) && (i % LINE_INTERVAL) == 0) {
-	  c_flags.emplace_back("LineAndLabel");
-	}
-	else {
-	  c_flags.emplace_back("NoLine");
-	}
-	l_dash_patterns.emplace_back("0");
-    }
-    std::string s;
-    for (const auto val : c_levels) {
-	s+=strutils::ftos(val,4)+",";
-    }
-    strutils::chop(s);
-    tdoc.add_replacement("__SPECIFIED_CONTOUR_LEVELS__",s);
-    s="";
-    for (size_t n=1; n <= c_levels.size(); ++n) {
-	s+=strutils::itos(n)+",";
-    }
-    strutils::chop(s);
-    tdoc.add_replacement("__SPECIFIED_CONTOUR_FILL_COLORS__",s);
-    s="";
-    for (const auto l : c_flags) {
-	s+="\""+l+"\",";
-    }
-    strutils::chop(s);
-    tdoc.add_replacement("__SPECIFIED_CONTOUR_LEVEL_FLAGS__",s);
-    tdoc.add_if("__SPECIFIED_CONTOUR_LINE_DASH_PATTERNS__");
-    s="";
-    for (const auto dp : l_dash_patterns) {
-	s+=dp+",";
-    }
-    strutils::chop(s);
-    tdoc.add_replacement("__SPECIFIED_CONTOUR_LINE_DASH_PATTERNS__",s);
+  if (std::regex_search(param,std::regex("^0\\.0\\.[045]$"))) {
+// GRIB2 temperature
+    central_value=273.15;
   }
-  else if (std::regex_search(param,std::regex("^0\\.1\\.8"))) {
-// total precipitation
-    tdoc.add_if("__SPECIFIED_CONTOUR_LEVELS__");
+  else if (std::regex_search(param,std::regex("^0\\.1\\.8$"))) {
+// GRIB2 total precipitation
     color_map="precip_new";
-    auto precip_contours=precipitation_contours();
-    auto precip_contour_flags=precipitation_contour_flags();
-    size_t num_minor_colors=(num_colors(color_map)-precip_contours.size()-2)/(precip_contours.size()-1);
-    std::string contours="0.,";
-    std::string flags="\"NoLine\",";
-    std::string colors="1";
-    auto n=1;
-    for (size_t x=0; x < precip_contours.size()-1; ++x) {
-	contours+=strutils::ftos(precip_contours[x],4)+",";
-	flags+="\""+precip_contour_flags[x]+"\",";
-	colors+=","+strutils::itos(++n);
-	double interval=(precip_contours[x+1]-precip_contours[x])/(num_minor_colors+1);
-	for (size_t m=1; m <= num_minor_colors; ++m) {
-	  contours+=strutils::ftos(precip_contours[x]+m*interval,4)+",";
-	  flags+="\"NoLine\",";
-	  colors+=","+strutils::itos(++n);
-	}
-    }
-    contours+=strutils::ftos(precip_contours.back(),4);
-    tdoc.add_replacement("__SPECIFIED_CONTOUR_LEVELS__",contours);
-    flags+="\"LineAndLabel\"";
-    tdoc.add_replacement("__SPECIFIED_CONTOUR_LEVEL_FLAGS__",flags);
-    colors+=","+strutils::itos(++n);
-    colors+=","+strutils::itos(++n);
-    tdoc.add_replacement("__SPECIFIED_CONTOUR_FILL_COLORS__",colors);
+    specified_contour_levels.reset(new std::vector<double>(precipitation_contours()));
+    specified_contour_level_types.reset(new std::vector<unsigned char>(precipitation_contour_types()));
+  }
+  else if (std::regex_search(param,std::regex("^0\\.1\\.0$"))) {
+// GRIB2 specific humidity
+    color_map="brown_green";
+  }
+  else if (std::regex_search(param,std::regex("^0\\.2\\.[23]$"))) {
+// GRIB2 u- and v- wind components
+    color_map="NCV_jaisnd";
+    central_value=0.;
+  }
+  if (specified_contour_levels == nullptr) {
+    set_contours_from_data(cdata.data_min,cdata.data_max,color_map,first_color_index,central_value,tdoc);
   }
   else {
-    if (floatutils::myequalf(cdata.data_min,0.)) {
-	color_map="precip";
-	tdoc.add_replacement("__CONTOUR_INTERVAL__",strutils::ftos((cdata.data_max-cdata.data_min)/(num_colors(color_map)-2.),4));
-	tdoc.add_if("__SPECIFIED_CONTOUR_FILL_COLORS__");
-	std::string fill_colors;
-	for (size_t n=1; n <= num_colors(color_map); ++n) {
-	  fill_colors+=strutils::itos(n)+",";
-	}
-	strutils::chop(fill_colors);
-	tdoc.add_replacement("__SPECIFIED_CONTOUR_FILL_COLORS__",fill_colors);
-    }
-    else {
-	color_map="NCV_bright";
-	tdoc.add_replacement("__CONTOUR_INTERVAL__",strutils::ftos((cdata.data_max-cdata.data_min)/num_colors(color_map),4));
-    }
+    set_contours_from_specified_values(*specified_contour_levels,*specified_contour_level_types,color_map,first_color_index,tdoc);
   }
   tdoc.add_replacement("__COLOR_MAP__",color_map);
   TokenDocument colormap("/usr/local/www/server_root/web/html/wms/"+color_map+".colormap");
@@ -1015,6 +1164,121 @@ void fill_get_map_parameters(const QueryString& query_string,MapParameters& mp)
   }
 }
 
+void set_legend_from_specified_values(const std::vector<double>& specified_contour_levels,const std::vector<unsigned char>& specified_contour_level_types,std::string color_map,size_t first_color_index,TokenDocument& tdoc)
+{
+  tdoc.add_if("__SPECIFIC_LABELS__");
+  auto data_range=specified_contour_levels.back()-specified_contour_levels.front();
+  auto label_precision=2;
+  while (label_precision < 5 && data_range < 1.) {
+    ++label_precision;
+    data_range*=10.;
+  }
+  auto num_colors=color_map_size(color_map)-first_color_index+1; 
+  auto num_minor_levels=(num_colors-1)/specified_contour_levels.size();
+  std::stringstream labels_ss;
+  if (label_precision < 5) {
+    labels_ss.setf(std::ios::fixed);
+    labels_ss.precision(label_precision);
+  }
+  else {
+    labels_ss.setf(std::ios::scientific);
+    labels_ss.precision(3);
+  }
+  auto num_boxes=0;
+  for (size_t n=0; n < specified_contour_levels.size()-1; ++n) {
+    if (!labels_ss.str().empty()) {
+	labels_ss << ",";
+    }
+    labels_ss << "\"" << specified_contour_levels[n] << "\"";
+    ++num_boxes;
+    for (size_t m=1; m <= num_minor_levels; ++m) {
+	auto minor_diff=(specified_contour_levels[n+1]-specified_contour_levels[n])/(num_minor_levels+1);
+	if (!labels_ss.str().empty()) {
+	  labels_ss << ",";
+	}
+	labels_ss << "\"" << specified_contour_levels[n]+m*minor_diff << "\"";
+	++num_boxes;
+    }
+  }
+  labels_ss << ",\"" << specified_contour_levels.back() << "\"";
+  ++num_boxes;
+// pad the labels so the legend displays properly
+  labels_ss << ",\"" << specified_contour_levels.back() << "\"";
+  ++num_boxes;
+  labels_ss << ",\"" << specified_contour_levels.back() << "\"";
+  ++num_boxes;
+  tdoc.add_replacement("__LABELS__",labels_ss.str());
+  tdoc.add_replacement("__NUM_LABEL_BOXES__",strutils::itos(num_boxes));
+  std::stringstream fill_colors_ss;
+  for (size_t n=0; n < specified_contour_levels.size()-1; ++n) {
+    if (!fill_colors_ss.str().empty()) {
+	fill_colors_ss << ",";
+    }
+    fill_colors_ss << first_color_index++;
+    for (size_t m=1; m <= num_minor_levels; ++m) {
+	if (!fill_colors_ss.str().empty()) {
+	  fill_colors_ss << ",";
+	}
+	fill_colors_ss << first_color_index++;
+    }
+  }
+  fill_colors_ss << "," << first_color_index;
+// pad the fill colors so the legend displays properly
+  fill_colors_ss << "," << first_color_index;
+  fill_colors_ss << "," << first_color_index;
+  tdoc.add_replacement("__FILL_COLORS__",fill_colors_ss.str());
+  tdoc.add_replacement("__LABEL_STRIDE__",strutils::itos(color_map_size(color_map)/specified_contour_levels.size()));
+}
+
+void set_legend_from_data(double data_min,double data_max,std::string color_map,size_t first_color_index,double central_value,TokenDocument& tdoc)
+// set first_color_index to 1 if the first filled contour should be the
+//   background color
+{
+  tdoc.add_if("__SPECIFIC_LABELS__");
+  auto data_range=data_max-data_min;
+  auto label_precision=2;
+  while (label_precision < 5 && data_range < 1.) {
+    ++label_precision;
+    data_range*=10.;
+  }
+  std::vector<double> contour_levels;
+  std::vector<short> contour_fill_colors,contour_dash_patterns;
+  std::vector<unsigned char> contour_types;
+  get_contours_from_data(data_min,data_max,color_map,first_color_index,central_value,contour_levels,contour_fill_colors,contour_types,contour_dash_patterns);
+  tdoc.add_replacement("__NUM_LABEL_BOXES__",strutils::itos(contour_levels.size()));
+  std::stringstream labels_ss;
+  if (label_precision < 5) {
+    labels_ss.setf(std::ios::fixed);
+    labels_ss.precision(label_precision);
+  }
+  else {
+    labels_ss.setf(std::ios::scientific);
+    labels_ss.precision(3);
+  }
+  for (const auto& contour_level : contour_levels) {
+    if (!labels_ss.str().empty()) {
+	labels_ss << ",";
+    }
+    labels_ss << contour_level;
+  }
+  tdoc.add_replacement("__LABELS__",labels_ss.str());
+  std::stringstream fill_colors_ss;
+  for (const auto& fill_color : contour_fill_colors) {
+    if (!fill_colors_ss.str().empty()) {
+	fill_colors_ss << ",";
+    }
+    fill_colors_ss << fill_color;
+  }
+  tdoc.add_replacement("__FILL_COLORS__",fill_colors_ss.str());
+  size_t num_major_contours=0;
+  for (const auto& contour_type : contour_types) {
+    if (contour_type == 0x1) {
+	++num_major_contours;
+    }
+  }
+  tdoc.add_replacement("__LABEL_STRIDE__",strutils::itos(color_map_size(color_map)/num_major_contours));
+}
+
 void output_legend(MapParameters& mp)
 {
   auto tdir_name=make_work_directory();
@@ -1022,44 +1286,37 @@ void output_legend(MapParameters& mp)
   read_layer_cache(mp.layers.front(),mp.time,cdata);
   TokenDocument tdoc("/usr/local/www/server_root/web/html/wms/legend.ncl");
   tdoc.add_replacement("__OUTFILE__",tdir_name+"/outfile."+image_formats["image/png"]);
-  std::string color_map;
+  std::unique_ptr<std::vector<double>> specified_contour_levels(nullptr);
+  std::unique_ptr<std::vector<unsigned char>> specified_contour_level_types(nullptr);
+  std::string color_map="NCV_bright";
+  size_t first_color_index=2;
+  double central_value=1.e18;
   auto lparts=strutils::split(mp.layers.front(),";");
   auto param=lparts[3].substr(lparts[3].find(":")+1);
-  if (std::regex_search(param,std::regex("^0\\.1\\.8"))) {
-// total precipitation
-    tdoc.add_if("__SPECIFIC_LABELS__");
+  if (std::regex_search(param,std::regex("^0\\.0\\.[045]$"))) {
+// GRIB2 temperature
+    central_value=273.15;
+  }
+  else if (std::regex_search(param,std::regex("^0\\.1\\.8$"))) {
+// GRIB2 total precipitation
     color_map="precip_new";
-    auto precip_contours=precipitation_contours();
-    size_t num_minor_boxes=(num_colors(color_map)-precip_contours.size())/(precip_contours.size()-1);
-    size_t num_labels=precip_contours.size()+num_minor_boxes*(precip_contours.size()-1)+1;
-    tdoc.add_replacement("__NUM_LABEL_BOXES__",strutils::itos(num_labels));
-    std::string s;
-    for (size_t n=2; n < num_labels+2; ++n) {
-	s+=strutils::itos(n)+",";
-    }
-    strutils::chop(s);
-    tdoc.add_replacement("__FILL_COLORS__",s);
-    s="\"0.00\",";
-    for (size_t n=1; n <= precip_contours.size(); ++n) {
-	for (size_t m=0; m < num_minor_boxes; ++m) {
-	  s+="\"\",";
-	}
-	s+="\""+strutils::ftos(precip_contours[n],6,2)+"\",";
-    }
-    strutils::chop(s);
-    tdoc.add_replacement("__LABELS__",s);
-    tdoc.add_replacement("__LABEL_STRIDE__",strutils::itos(num_minor_boxes+1));
+    specified_contour_levels.reset(new std::vector<double>(precipitation_contours()));
+    specified_contour_level_types.reset(new std::vector<unsigned char>(precipitation_contour_types()));
+  }
+  else if (std::regex_search(param,std::regex("^0\\.1\\.0$"))) {
+// GRIB2 specific humidity
+    color_map="brown_green";
+  }
+  else if (std::regex_search(param,std::regex("^0\\.2\\.[23]$"))) {
+// GRIB2 u- and v- wind components
+    color_map="NCV_jaisnd";
+    central_value=0.;
+  }
+  if (specified_contour_levels == nullptr) {
+    set_legend_from_data(cdata.data_min,cdata.data_max,color_map,first_color_index,central_value,tdoc);
   }
   else {
-    if (floatutils::myequalf(cdata.data_min,0.)) {
-	color_map="precip";
-	tdoc.add_replacement("__BOX_SIZE__",strutils::ftos((cdata.data_max-cdata.data_min)/(num_colors(color_map)-1.),4));
-    }
-    else {
-	color_map="NCV_bright";
-	tdoc.add_replacement("__BOX_SIZE__",strutils::ftos((cdata.data_max-cdata.data_min)/num_colors(color_map),4));
-    }
-    tdoc.add_replacement("__MIN_VAL__",strutils::ftos(cdata.data_min,4));
+    set_legend_from_specified_values(*specified_contour_levels,*specified_contour_level_types,color_map,first_color_index,tdoc);
   }
   tdoc.add_replacement("__COLOR_MAP__",color_map);
   TokenDocument colormap("/usr/local/www/server_root/web/html/wms/"+color_map+".colormap");
@@ -1124,6 +1381,13 @@ int main(int argc,char **argv)
 // sets the effective user so that the service has the correct directory/file
 //   access permissions
   setreuid(15968,15968);
+
+// use the server name to determine whether this is a development or operational
+//   request
+  auto env=getenv("HTTP_HOST");
+  if (env != nullptr && std::string(env) == "rda-web-dev.ucar.edu") {
+    is_dev=true;
+  }
 
 // parse the query string from the request URL
   QueryString query_string;
