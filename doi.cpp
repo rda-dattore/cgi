@@ -11,6 +11,10 @@
 #include <MySQL.hpp>
 #include <xml.hpp>
 #include <utils.hpp>
+#include <myerror.hpp>
+
+std::string myerror="";
+std::string mywarning="";
 
 // testing
 /*
