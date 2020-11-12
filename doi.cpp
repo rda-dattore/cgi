@@ -6,11 +6,11 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <regex>
-#include <web/web.h>
-#include <citation.h>
-#include <MySQL.h>
-#include <xml.h>
-#include <utils.h>
+#include <web/web.hpp>
+#include <citation.hpp>
+#include <MySQL.hpp>
+#include <xml.hpp>
+#include <utils.hpp>
 
 // testing
 /*
