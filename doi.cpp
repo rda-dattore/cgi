@@ -48,18 +48,18 @@ int main(int argc,char **argv)
 
   parseQueryString();
   MySQL::Server server(<host>,<username>,<password>,<database>);
-  if (!server.isConnected()) {
+  if (!server) {
     web_error2("unable to connect to the database","500 Internal Server Error");
   }
   query.set("select d.dsid,d.status,g.logname,g.fstname,g.lstname from dsvrsn as d left join dsowner as o on o.dsid = d.dsid left join dssgrp as g on g.logname = o.specialist where d.doi = '"+doi+"' order by find_in_set(status,'A,H')");
   if (query.submit(server) < 0) {
     web_error2("database query error","500 Internal Server Error");
   }
-  if (query.getResultLength() == 0) {
+  if (query.num_rows() == 0) {
     web_error2("DOI not found","400 Bad Request");
   }
   else {
-    if (query.getCurrentResult(row) != 0) {
+    if (!query.fetch_row(row) != 0) {
 	web_error2("unable to connect to the database","500 Internal Server Error");
     }
     if (row[1] == "A") {
@@ -67,7 +67,7 @@ int main(int argc,char **argv)
 	if (query2.submit(server) < 0) {
 	  web_error2("database query error","500 Internal Server Error");
 	}
-	query2.getCurrentResult(row2);
+	query2.fetch_row(row2);
 	printTitle();
 	std::cout << "<script id=\"citation_script\" language=\"javascript\">" << std::endl;
 	std::cout << "function changeCitation() {" << std::endl;
@@ -97,15 +97,15 @@ int main(int argc,char **argv)
 	if (query2.submit(server) < 0) {
 	  web_error2("database query error","500 Internal Server Error");
 	}
-	if (query2.getResultLength() == 0) {
+	if (query2.num_rows() == 0) {
 // terminated DOI
 	  printTitle();
 	}
-	else if (query2.getResultLength() == 1) {
+	else if (query2.num_rows() == 1) {
 // superseded DOI
 	  printTitle();
 	  std::cout << "<p><img src=\"/images/alert.gif\" />&nbsp;The DOI that you provided: " << doi << " has been superseded by a new version of the data.  Your options are:<ul><li>Go to the <a href=\"/datasets/"+row[0]+"/\">new version</a> of the data</li><li>Contact <a href=\"mailto:"+row[2]+"@ucar.edu?subject=DOI "+doi+"\">"+row[3]+" "+row[4]+"</a> to find out how you can get access to the superseded data";
-	  if (query.getResultLength() > 1) {
+	  if (query.num_rows() > 1) {
 	    std::cout << "<ul>Note:  Multiple versions of superseded data exist.  If you know the date that the data were accessed, it will help us get you the exact files associated with this DOI.</ul>";
 	  }
 	  std::cout << "</li></p>" << std::endl;
