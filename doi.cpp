@@ -46,8 +46,14 @@ int main(int argc,char **argv)
   MySQL::Row row,row2;
   XMLDocument xdoc;
 
+// read the cgi-bin configuration
+  webutils::cgi::Directives directives;
+  if (!webutils::cgi::read_config(directives)) {
+    web_error2("unable to read configuration","500 Internal Server Error");
+  }
+
   parseQueryString();
-  MySQL::Server server(<host>,<username>,<password>,<database>);
+  MySQL::Server server(directives.database_server,directives.rdadb_username,directives.rdadb_password,"dssdb");
   if (!server) {
     web_error2("unable to connect to the database","500 Internal Server Error");
   }
