@@ -16,12 +16,7 @@
 std::string myerror="";
 std::string mywarning="";
 
-// testing
-/*
-const std::string SHOULDER="10.5072/FK2";
-*/
-// operational
-const std::string SHOULDER="10.5065/D6";
+const std::string NCAR_PREFIX="10.5065/";
 
 std::string doi,type,dsnum;
 
@@ -33,7 +28,7 @@ void parseQueryString()
   if (doi.length() == 0) {
     web_error2("missing DOI","400 Bad Request");
   }
-  if (!std::regex_search(doi,std::regex("^"+SHOULDER))) {
+  if (!std::regex_search(doi,std::regex("^"+NCAR_PREFIX))) {
     web_error2("invalid DOI","400 Bad Request");
   }
 }
