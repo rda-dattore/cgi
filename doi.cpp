@@ -1,3 +1,7 @@
+/*
+** DOI resolver for DOIs that have been assigned to RDA datasets.
+*/
+
 #include <iostream>
 #include <stdlib.h>
 #include <sys/stat.h>
