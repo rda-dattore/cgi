@@ -25,7 +25,7 @@ void parseQueryString()
 {
   QueryString queryString(QueryString::GET);
 
-  doi=queryString.getValue("doi");
+  doi=queryString.value("doi");
   if (doi.length() == 0) {
     web_error2("missing DOI","400 Bad Request");
   }
