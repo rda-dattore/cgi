@@ -42,12 +42,12 @@ void printTitle()
 
 int main(int argc,char **argv)
 {
-  MySQLLocalQuery query,query2;
-  MySQLRow row,row2;
+  MySQL::LocalQuery query,query2;
+  MySQL::Row row,row2;
   XMLDocument xdoc;
 
   parseQueryString();
-  MySQLServer server(<host>,<username>,<password>,<database>);
+  MySQL::Server server(<host>,<username>,<password>,<database>);
   if (!server.isConnected()) {
     web_error2("unable to connect to the database","500 Internal Server Error");
   }
