@@ -27,10 +27,10 @@ void parseQueryString()
 
   doi=queryString.getValue("doi");
   if (doi.length() == 0) {
-    webError("missing DOI");
+    web_error2("missing DOI","400 Bad Request");
   }
   if (!std::regex_search(doi,std::regex("^"+SHOULDER))) {
-    webError("invalid DOI");
+    web_error2("invalid DOI","400 Bad Request");
   }
 }
 
@@ -49,23 +49,23 @@ int main(int argc,char **argv)
   parseQueryString();
   MySQLServer server(<host>,<username>,<password>,<database>);
   if (!server.isConnected()) {
-    webError("unable to connect to the database");
+    web_error2("unable to connect to the database","500 Internal Server Error");
   }
   query.set("select d.dsid,d.status,g.logname,g.fstname,g.lstname from dsvrsn as d left join dsowner as o on o.dsid = d.dsid left join dssgrp as g on g.logname = o.specialist where d.doi = '"+doi+"' order by find_in_set(status,'A,H')");
   if (query.submit(server) < 0) {
-    webError(query.error());
+    web_error2("database query error","500 Internal Server Error");
   }
   if (query.getResultLength() == 0) {
-    webError("DOI not found");
+    web_error2("DOI not found","400 Bad Request");
   }
   else {
     if (query.getCurrentResult(row) != 0) {
-	webError("unable to connect to the database");
+	web_error2("unable to connect to the database","500 Internal Server Error");
     }
     if (row[1] == "A") {
 	query2.set("title,pub_date","search.datasets","dsid = '"+row[0].substr(2)+"'");
 	if (query2.submit(server) < 0) {
-	  webError(query2.error());
+	  web_error2("database query error","500 Internal Server Error");
 	}
 	query2.getCurrentResult(row2);
 	printTitle();
@@ -95,7 +95,7 @@ int main(int argc,char **argv)
     else if (row[1] == "H") {
 	query2.set("doi","dsvrsn","dsid = '"+row[0]+"' and status = 'A'");
 	if (query2.submit(server) < 0) {
-	  webError(query2.error());
+	  web_error2("database query error","500 Internal Server Error");
 	}
 	if (query2.getResultLength() == 0) {
 // terminated DOI
@@ -112,10 +112,10 @@ int main(int argc,char **argv)
 	}
 	else
 // SEND EMAIL
-	  webError("database error");
+	  web_error2("database error","500 Internal Server Error");
     }
     else
 // SEND EMAIL
-	webError("database error");
+	web_error2("database error","500 Internal Server Error");
   }
 }
