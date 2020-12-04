@@ -1425,7 +1425,7 @@ void print_parameters(std::string& format,xmlutils::LevelMapper& level_mapper)
 	if (row2[0].length() == 0) {
 	  MySQL::LocalQuery query3;
 	  MySQL::Row row3;
-	  query3.set("select distinct l.type,l.map,l.value,f.format from metautil.custom_dap_grid_index as g left join WGrML.levels as l on l.code = g.level_code left join WGrML.ds"+dap_args.dsnum2+"_webfiles as w on w.code = g.webID_code left join WGrML.formats as f on f.code = w.format_code where g.param = '"+row[0]+"' and g.ID = '"+dap_args.ID+"' and g.time_slice_index = 0");
+	  query3.set("select distinct l.type,l.map,l.value,f.format from metautil.custom_dap_grid_index as g left join WGrML.levels as l on l.code = g.level_code left join WGrML.ds"+dap_args.dsnum2+"_webfiles2 as w on w.code = g.webID_code left join WGrML.formats as f on f.code = w.format_code where g.param = '"+row[0]+"' and g.ID = '"+dap_args.ID+"' and g.time_slice_index = 0");
 	  if (query3.submit(server) < 0) {
 	    std::cerr << "opendap print_DAS(1b): " << query2.error() << " for " << query2.show() << std::endl;
 	    dap_error("500 Internal Server Error","Database error print_DAS(1b)");
@@ -1652,7 +1652,7 @@ std::cerr << "but it did happen (2)" << std::endl;
   else {
     query_spec << "<FCODE>!<PCODE>";
   }
-  query_spec << "` as i on i.valid_date = g.valid_date and i.webID_code = g.webID_code and i.timeRange_code = g.timeRange_code and i.level_code = g.level_code left join WGrML.ds" << dap_args.dsnum2 << "_webfiles as w on w.code = i.webID_code left join WGrML.formats as f on f.code = w.format_code where g.ID = '" << dap_args.ID << "' and g.param = '" << pe.key << "'";
+  query_spec << "` as i on i.valid_date = g.valid_date and i.webID_code = g.webID_code and i.timeRange_code = g.timeRange_code and i.level_code = g.level_code left join WGrML.ds" << dap_args.dsnum2 << "_webfiles2 as w on w.code = i.webID_code left join WGrML.formats as f on f.code = w.format_code where g.ID = '" << dap_args.ID << "' and g.param = '" << pe.key << "'";
   std::string order_by;
   if (pe.data->ref_time_dim.name.length() > 0) {
     if (pe.data->idx[0].start == pe.data->idx[0].stop) {
