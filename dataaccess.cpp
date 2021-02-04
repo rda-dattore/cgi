@@ -29,8 +29,8 @@ struct GroupControlEntry {
   std::shared_ptr<Data> data;
 };
 struct SpanData {
-// initialize ncar_only_access as 1 for automatic HPSS listing
-  SpanData() : data_file_downloads(0),ncar_only_access(1) {}
+  SpanData() : data_file_downloads(0),ncar_only_access(0) {}
+  size_t num_columns() const { return (data_file_downloads+ncar_only_access); }
 
   int data_file_downloads,ncar_only_access;
 };
@@ -209,6 +209,10 @@ void get_web_data(std::string& webhome,SpanData& span_data)
 void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std::string access_type,SpanData& span_data,std::stringstream& matrix_ss)
 {
   matrix_ss << "Content-type: text/html" << std::endl << std::endl;
+  if (span_data.num_columns() == 0) {
+    matrix_ss << "<p>This dataset contains data files that are not currently publicly accessible. For assistance, please submit a request on the <a href=\"https://helpdesk.ucar.edu/plugins/servlet/desk/portal/6\">RDA Support Portal</a> for access to the data in this dataset. Be sure to include the dataset title in your request.</p>";
+    return;
+  }
   matrix_ss << "<link rel=\"stylesheet\" type=\"text/css\" href=\"/css/matrix.css\" />" << std::endl;
   if (!webhome.empty()) {
     matrix_ss << "<script id=\"globus_script\" src=\"/js/rda_globus.js\" type=\"text/javascript\"></script>" << std::endl;
@@ -283,7 +287,7 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
   auto found_group_hpss_staged_access=false;
   auto found_group_format_conversion=false;
   MySQL::PreparedStatement group_pstmt;
-  if (run_prepared_statement(server,"select gindex,title,pmsscnt,dwebcnt,nwebcnt,mnote,wnote,grpid from dsgroup where dsid = concat('ds',?) and pindex = 0 and (pmsscnt > 0 or dwebcnt > 0 or nwebcnt > 0) order by gindex",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{dsnum},group_pstmt,pstmt_error) && group_pstmt.num_rows() > 1) {
+  if (run_prepared_statement(server,"select gindex,title,dwebcnt,nwebcnt,mnote,wnote,grpid from dsgroup where dsid = concat('ds',?) and pindex = 0 and (dwebcnt > 0 or nwebcnt > 0) order by gindex",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{dsnum},group_pstmt,pstmt_error) && group_pstmt.num_rows() > 1) {
     if (run_prepared_statement(server,"select gindex,rqsttype,url from rcrqst where dsid = concat('ds',?) and gindex != 0",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{dsnum},pstmt,pstmt_error) && pstmt.num_rows() > 0) {
 	for (const auto& row : pstmt) {
 	  if (group_control_table.find(row["gindex"]) == group_control_table.end()) {
@@ -363,7 +367,9 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
     }
     matrix_ss << " thick-border-right\" style=\"background-color: #c6f0ff\">Other Access Methods</th>";
   }
-  matrix_ss << "<th>&nbsp;</th><th class=\"thick-border-top thick-border-left thick-border-right\" style=\"background-color: #b8edab\" colspan=\"" << span_data.ncar_only_access << "\">NCAR-Only Access</th>";
+  if (span_data.ncar_only_access > 0) {
+    matrix_ss << "<th>&nbsp;</th><th class=\"thick-border-top thick-border-left thick-border-right\" style=\"background-color: #b8edab\" colspan=\"" << span_data.ncar_only_access << "\">NCAR-Only Access</th>";
+  }
   matrix_ss << "</tr>" << std::endl;
   matrix_ss << "<tr>";
   if (group_pstmt.num_rows() > 1) {
@@ -437,16 +443,8 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
   }
   matrix_ss << "<th>&nbsp;</th>";
   if (!webhome.empty()) {
-    matrix_ss << "<th class=\"thin-border-top thick-border-left\" style=\"background-color: #b8edab\"><div style=\"position: relative\" onMouseOver=\"popInfo(this,'iglade',null,'rcenter+30','bottom+10')\" onMouseOut=\"hideInfo('iglade')\"><span style=\"border-bottom: black 1px dashed; cursor: pointer\">Central File System (GLADE) Holdings</span></div></th>";
+    matrix_ss << "<th class=\"thin-border-top thick-border-left thick-border-right\" style=\"background-color: #b8edab\"><div style=\"position: relative\" onMouseOver=\"popInfo(this,'iglade',null,'rcenter+30','bottom+10')\" onMouseOut=\"hideInfo('iglade')\"><span style=\"border-bottom: black 1px dashed; cursor: pointer\">Central File System (GLADE) Holdings</span></div></th>";
   }
-  matrix_ss << "<th class=\"thin-border-top";
-  if (!webhome.empty()) {
-    matrix_ss << " thin-border-left";
-  }
-  else {
-    matrix_ss << " thick-border-left";
-  }
-  matrix_ss << " thick-border-right\" style=\"background-color: #b8edab\"><div style=\"position: relative\" onMouseOver=\"popInfo(this,'ihpss',null,'rcenter+30','bottom+10')\" onMouseOut=\"hideInfo('ihpss')\"><span style=\"border-bottom: black 1px dashed; cursor: pointer\">Tape Archive (HPSS) Holdings</span></div></th>";
   matrix_ss << "</tr>" << std::endl;
 // row for the full dataset
   matrix_ss << "<tr>";
@@ -602,7 +600,7 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
   }
   matrix_ss << "<td>&nbsp;</td>";
   if (!webhome.empty()) {
-    matrix_ss << "<td align=\"center\" class=\"thick-border-top thick-border-left thin-border-bottom\" style=\"background-color: #b8edab\"><a class=\"matrix\" href=\"/datasets/ds" << dsnum << "/index.html#!";
+    matrix_ss << "<td align=\"center\" class=\"thick-border-top thick-border-left thin-border-bottom thick-border-right\" style=\"background-color: #b8edab\"><a class=\"matrix\" href=\"/datasets/ds" << dsnum << "/index.html#!";
     if (web_it != web_end) {
 	matrix_ss << "cgi-bin/datasets/getGladeList?dsnum=" << dsnum;
     }
@@ -611,37 +609,12 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
     }
     matrix_ss << "\">GLADE File<br />Listing</a></td>";
   }
-  matrix_ss << "<td align=\"center\" class=\"thick-border-top";
-  if (!webhome.empty()) {
-    matrix_ss << " thin-border-left";
-  }
-  else {
-    matrix_ss << " thick-border-left";
-  }
-  matrix_ss << " thick-border-right thin-border-bottom\" style=\"background-color: #b8edab\"><a class=\"matrix\" href=\"#!";
-  if (found_hpss_cache_file) {
-    matrix_ss << "cgi-bin/datasets/getMssList?dsnum=" << dsnum;
-  }
-  else {
-    matrix_ss << "sfol-hl";
-  }
-  matrix_ss << "\">HPSS File<br />Listing</a></td>";
   matrix_ss << "</tr>" << std::endl;
 // add the individual top-level groups
   if (group_pstmt.num_rows() > 1) {
     auto n=0;
     for (const auto& row : group_pstmt) {
 	auto gindex=row["gindex"];
-	auto found_hpss_group_cache_file=false;
-	if (row["pmsscnt"] != "0") {
-	  for (const auto& db : hpss_dblist) {
-	    struct stat buf;
-	    if (stat((doc_root+"/datasets/ds"+dsnum+"/metadata/customize."+db+"."+gindex).c_str(),&buf) == 0) {
-		found_hpss_group_cache_file=true;
-		break;
-	    }
-	  }
-	}
 	GroupControlEntry gce;
 	auto found_group_control=false;
 	if (group_control_table.find(gindex) != group_control_table.end()) {
@@ -657,10 +630,7 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
 	if (title.empty()) {
 	  title=row["grpid"];
 	}
-	if (row["pmsscnt"] != "0" && !row["mnote"].empty()) {
-	  matrix_ss << "<div style=\"position: relative\" onMouseOver=\"popInfo(this,'inote" << gindex << "',null,'left','bottom+10')\" onMouseOut=\"hideInfo('inote" << gindex << "')\"><span style=\"border-bottom: black 1px dashed; cursor: pointer\">" << title << "</span></div><div id=\"inote" << gindex << "\" class=\"bubble-top-left-arrow\" style=\"width: 600px\">" << row["mnote"] << "</div>";
-	}
-	else if (row["dwebcnt"] != "0" && !row["wnote"].empty()) {
+	if (row["dwebcnt"] != "0" && !row["wnote"].empty()) {
 	  matrix_ss << "<div style=\"position: relative\" onMouseOver=\"popInfo(this,'inote" << gindex << "',null,'left','bottom+10')\" onMouseOut=\"hideInfo('inote" << gindex << "')\"><span style=\"border-bottom: black 1px dashed; cursor: pointer\">" << title << "</span></div><div id=\"inote" << gindex << "\" class=\"bubble-top-left-arrow\" style=\"width: 600px\">" << row["wnote"] << "</div>";
 	}
 	else {
@@ -735,14 +705,7 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
 	if (has_hpss_staged_access) {
 	  matrix_ss << "<td align=\"center\" class=\"thin-border-top thick-border-right\" style=\"background-color: #effee1\">";
 	  if (!found_group_hpss_staged_access || (found_group_control && gce.data->has_hpss_staged_access)) {
-	    matrix_ss << "<a class=\"matrix\" href=\"/datasets/ds" << dsnum << "/index.html#!";
-	    if (found_hpss_group_cache_file) {
-		matrix_ss << "cgi-bin/datasets/getMssList?dsnum=" << dsnum << "&disp=hr&gindex=" << gindex;
-	    }
-	    else {
-		matrix_ss << "sfol-hr?g=" << gindex;
-	    }
-	    matrix_ss << "\">Request<br />Access</a>";
+	    matrix_ss << "<a class=\"matrix\" href=\"/datasets/ds" << dsnum << "/index.html#!" << "sfol-hr?g=" << gindex << "\">Request<br />Access</a>";
 	  }
 	  else {
 	    matrix_ss << "&nbsp;";
@@ -792,7 +755,7 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
 	}
 	matrix_ss << "<td>&nbsp;</td>";
 	if (!webhome.empty()) {
-	  matrix_ss << "<td align=\"center\" class=\"thin-border-top thick-border-left\" style=\"background-color: #b8edab\">";
+	  matrix_ss << "<td align=\"center\" class=\"thin-border-top thick-border-left thick-border-right\" style=\"background-color: #b8edab\">";
 	  if (row["dwebcnt"] != "0") {
 	    if (web_it != web_end) {
 		matrix_ss << "<a class=\"matrix\" href=\"/datasets/ds" << dsnum << "/index.html#!cgi-bin/datasets/getGladeList?dsnum=" << dsnum << "&gindex=" << gindex << "\">GLADE File<br />Listing</a>";
@@ -815,28 +778,6 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
 	  matrix_ss << "&nbsp;";
 	}
 	matrix_ss << "</td>";
-	matrix_ss << "<td align=\"center\" class=\"thin-border-top";
-	if (!webhome.empty()) {
-	  matrix_ss << " thin-border-left";
-	}
-	else {
-	  matrix_ss << " thick-border-left";
-	}
-	matrix_ss << " thick-border-right\" style=\"background-color: #b8edab\">";
-	if (row["pmsscnt"] != "0") {
-	  matrix_ss << "<a class=\"matrix\" href=\"#!";
-	  if (found_hpss_group_cache_file) {
-	    matrix_ss << "cgi-bin/datasets/getMssList?dsnum=" << dsnum << "&gindex=" << gindex;
-	  }
-	  else {
-	    matrix_ss << "sfol-hl?g=" << gindex;
-	  }
-	  matrix_ss << "\">HPSS File<br />Listing</a>";
-	}
-	else {
-	  matrix_ss << "&nbsp;";
-	}
-	matrix_ss << "</td>";
 	matrix_ss << "</tr>" << std::endl;
 	++n;
     }
@@ -850,14 +791,20 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
   }
   if (group_pstmt.num_rows() > 1) {
     span_data.data_file_downloads+=2;
-    matrix_ss << "<tr><th class=\"thick-border-top\" colspan=\"" << span_data.data_file_downloads << "\">&nbsp;</th><th>&nbsp;</th><th class=\"thick-border-top\" colspan=\"" << span_data.ncar_only_access << "\">&nbsp;</th></tr>" << std::endl;
+    matrix_ss << "<tr><th class=\"thick-border-top\" colspan=\"" << span_data.data_file_downloads << "\">&nbsp;</th>";
+    if (span_data.ncar_only_access > 0) {
+	matrix_ss << "<th>&nbsp;</th><th class=\"thick-border-top\" colspan=\"" << span_data.ncar_only_access << "\">&nbsp;</th></tr>" << std::endl;
+    }
   }
   else {
     matrix_ss << "<tr>";
     if (span_data.data_file_downloads > 0) {
 	matrix_ss << "<th class=\"thin-border-top\" colspan=\"" << span_data.data_file_downloads << "\">&nbsp;</th>";
     }
-    matrix_ss << "<th>&nbsp;</th><th class=\"thin-border-top\" colspan=\"" << span_data.ncar_only_access << "\">&nbsp;</th></tr>" << std::endl;
+    if (span_data.ncar_only_access > 0) {
+	matrix_ss << "<th>&nbsp;</th><th class=\"thin-border-top\" colspan=\"" << span_data.ncar_only_access << "\">&nbsp;</th>";
+    }
+    matrix_ss << "</tr>" << std::endl;
   }
   matrix_ss << "</table>" << std::endl;
   matrix_ss << "</div></center>" << std::endl;
