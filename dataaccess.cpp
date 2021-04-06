@@ -185,11 +185,11 @@ void verify_authorization(std::string doc_root,std::string ruser,std::string& ac
   }
 }
 
-void get_web_data(std::string& webhome,SpanData& span_data)
+void get_web_data(std::string& webhome, std::string& locflag, SpanData& span_data)
 {
   MySQL::PreparedStatement pstmt;
   std::string pstmt_error;
-  if (!run_prepared_statement(server,"select dwebcnt,inet_access from dataset as d left join search.datasets as s on concat('ds',s.dsid) = d.dsid where s.dsid = ?",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{dsnum},pstmt,pstmt_error)) {
+  if (!run_prepared_statement(server,"select dwebcnt, inet_access, locflag from dataset as d left join search.datasets as s on concat('ds',s.dsid) = d.dsid where s.dsid = ?",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{dsnum},pstmt,pstmt_error)) {
     print_server_trouble();
   }
   else if (pstmt.num_rows() == 0) {
@@ -199,18 +199,27 @@ void get_web_data(std::string& webhome,SpanData& span_data)
   pstmt.fetch_row(row);
   if (row["dwebcnt"] != "0" && row["inet_access"] == "Y") {
     webhome="/data/ds"+dsnum;
-// web file listing and globus transfer request
-    span_data.data_file_downloads+=2;
-// glade holdings
+    locflag = row["locflag"];
+
+    // web file listing
+    ++span_data.data_file_downloads;
+
+    // globus transfer request is not available for Object Store files
+    if (locflag != "O") {
+      ++span_data.data_file_downloads;
+    }
+
+    // glade holdings
     ++span_data.ncar_only_access;
   }
 }
 
-void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std::string access_type,SpanData& span_data,std::stringstream& matrix_ss)
+void build_matrix(std::string doc_root,std::string webhome, std::string locflag, std::string ruser,std::string access_type,SpanData& span_data,std::stringstream& matrix_ss)
 {
   matrix_ss << "Content-type: text/html" << std::endl << std::endl;
   if (span_data.num_columns() == 0) {
-    matrix_ss << "<p>This dataset contains data files that are not currently publicly accessible. For assistance, please submit a request on the <a href=\"https://helpdesk.ucar.edu/plugins/servlet/desk/portal/6\">RDA Support Portal</a> for access to the data in this dataset. Be sure to include the dataset title in your request.</p>";
+//    matrix_ss << "<p>This dataset contains data files that are not currently publicly accessible. For assistance, please submit a request on the <a href=\"https://helpdesk.ucar.edu/plugins/servlet/desk/portal/6\">RDA Support Portal</a> for access to the data in this dataset. Be sure to include the dataset title in your request.</p>";
+matrix_ss << "<p>This dataset contains data files that are not currently publicly accessible. For assistance, please submit a request to <a href=\"mailto:rdahelp@ucar.edu\">rdahelp@ucar.edu</a> for access to the data in this dataset. Be sure to include the dataset title in your request.</p>";
     return;
   }
   matrix_ss << "<link rel=\"stylesheet\" type=\"text/css\" href=\"/css/matrix.css\" />" << std::endl;
@@ -386,14 +395,22 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
 	  matrix_ss << " thick-border-left";
 	  no_left_border_yet=false;
 	}
-	matrix_ss << " thin-border-right\" style=\"background-color: #effee1\"><div style=\"position: relative\" onMouseOver=\"popInfo(this,'iwebhold',null,'center-30','bottom+10')\" onMouseOut=\"hideInfo('iwebhold')\"><span style=\"border-bottom: black 1px dashed; cursor: pointer\">Web Server Holdings</span></div></th><th class=\"thin-border-top";
-	if (format_conversion.empty() && !has_hpss_staged_access) {
+	if (locflag == "O" && format_conversion.empty() && !has_hpss_staged_access) {
 	  matrix_ss << " thick-border-right";
-	}
-	else {
+	} else {
 	  matrix_ss << " thin-border-right";
 	}
-	matrix_ss << "\" style=\"background-color: #effee1\"><div style=\"position: relative\" onMouseOver=\"popInfo(this,'iglobus',null,'center-30','bottom+10')\" onMouseOut=\"hideInfo('iglobus')\"><span style=\"border-bottom: black 1px dashed; cursor: pointer\">Globus Transfer Service (GridFTP)</span></div></th>";
+	matrix_ss << "\" style=\"background-color: #effee1\"><div style=\"position: relative\" onMouseOver=\"popInfo(this,'iwebhold',null,'center-30','bottom+10')\" onMouseOut=\"hideInfo('iwebhold')\"><span style=\"border-bottom: black 1px dashed; cursor: pointer\">Web Server Holdings</span></div></th>";
+	if (locflag != "O") {
+	  matrix_ss << "<th class=\"thin-border-top";
+	  if (format_conversion.empty() && !has_hpss_staged_access) {
+	    matrix_ss << " thick-border-right";
+	  }
+	  else {
+	    matrix_ss << " thin-border-right";
+	  }
+	  matrix_ss << "\" style=\"background-color: #effee1\"><div style=\"position: relative\" onMouseOver=\"popInfo(this,'iglobus',null,'center-30','bottom+10')\" onMouseOut=\"hideInfo('iglobus')\"><span style=\"border-bottom: black 1px dashed; cursor: pointer\">Globus Transfer Service (GridFTP)</span></div></th>";
+	}
     }
     if (!format_conversion.empty()) {
 	matrix_ss << "<th class=\"thin-border-top";
@@ -473,7 +490,12 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
 	  matrix_ss << " thick-border-left";
 	  no_left_border_yet=false;
 	}
-	matrix_ss << " thin-border-right thin-border-bottom\" style=\"background-color: #effee1\">";
+	if (locflag == "O" && format_conversion.empty() && !has_hpss_staged_access) {
+	  matrix_ss << " thick-border-right";
+	} else {
+	  matrix_ss << " thin-border-right";
+	}
+	matrix_ss << " thin-border-bottom\" style=\"background-color: #effee1\">";
 //	if (!webhome.empty()) {
 	  for (; web_it != web_end; ++web_it) {
 	    struct stat buf;
@@ -493,22 +515,25 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
 //	else {
 //	  matrix_ss << "&nbsp;";
 //	}
-	matrix_ss << "</td><td align=\"center\" class=\"thick-border-top";
-	if (format_conversion.empty() && !has_hpss_staged_access) {
-	  matrix_ss << " thick-border-right";
+	matrix_ss << "</td>";
+	if (locflag != "O") {
+	  matrix_ss << "<td align=\"center\" class=\"thick-border-top";
+	  if (format_conversion.empty() && !has_hpss_staged_access) {
+	    matrix_ss << " thick-border-right";
+	  }
+	  else {
+	    matrix_ss << " thin-border-right";
+	  }
+	  matrix_ss << " thin-border-bottom\" style=\"background-color: #effee1\"><a class=\"matrix\" ";
+	  MySQL::Row row;
+	  if (run_prepared_statement(server,"select globus_url from goshare where email = '"+ruser+"' and dsid = concat('ds',?) and status = 'ACTIVE'",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{dsnum},pstmt,pstmt_error) && pstmt.fetch_row(row)) {
+	    matrix_ss << "href=\"" << row[0] << "\" target=\"_globus\">Globus Transfer";
+	  }
+	  else {
+	    matrix_ss << "href=\"javascript:void(0)\" onClick=\"requestGlobusInvite(2,undefined,'ds" << dsnum << "');win.onunload=function(){ win.opener.location='/datasets/ds" << dsnum << "/index.html#!access?r='+Math.random(); }\">Request Globus Transfer";
+	  }
+	  matrix_ss << "</a></td>";
 	}
-	else {
-	  matrix_ss << " thin-border-right";
-	}
-	matrix_ss << " thin-border-bottom\" style=\"background-color: #effee1\"><a class=\"matrix\" ";
-	MySQL::Row row;
-	if (run_prepared_statement(server,"select globus_url from goshare where email = '"+ruser+"' and dsid = concat('ds',?) and status = 'ACTIVE'",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{dsnum},pstmt,pstmt_error) && pstmt.fetch_row(row)) {
-	  matrix_ss << "href=\"" << row[0] << "\" target=\"_globus\">Globus Transfer";
-	}
-	else {
-	  matrix_ss << "href=\"javascript:void(0)\" onClick=\"requestGlobusInvite(2,undefined,'ds" << dsnum << "');win.onunload=function(){ win.opener.location='/datasets/ds" << dsnum << "/index.html#!access?r='+Math.random(); }\">Request Globus Transfer";
-	}
-	matrix_ss << "</a></td>";
     }
     if (!format_conversion.empty()) {
 	matrix_ss << "<td align=\"center\" class=\"thick-border-top";
@@ -638,7 +663,13 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
 	}
 	matrix_ss << "</td>";
 	if (!webhome.empty()) {
-	  matrix_ss << "<td align=\"center\" class=\"thin-border-top thin-border-right\" style=\"background-color: #effee1\">";
+	  matrix_ss << "<td align=\"center\" class=\"thin-border-top";
+	  if (locflag == "O" && format_conversion.empty() && !has_hpss_staged_access) {
+	    matrix_ss << " thick-border-right";
+	  } else {
+	    matrix_ss << " thin-border-right";
+	  }
+	  matrix_ss << "\" style=\"background-color: #effee1\">";
 	  if (row["dwebcnt"] != "0") {
 	    web_it=Web_dblist.begin();
 	    for (; web_it != web_end; ++web_it) {
@@ -659,14 +690,17 @@ void build_matrix(std::string doc_root,std::string webhome,std::string ruser,std
 	  else {
 	    matrix_ss << "&nbsp;";
 	  }
-	  matrix_ss << "</td><td class=\"thin-border-top";
-	  if (format_conversion.empty() && !has_hpss_staged_access) {
-	    matrix_ss << " thick-border-right";
+	  matrix_ss << "</td>";
+	  if (locflag != "O") {
+	    matrix_ss << "<td class=\"thin-border-top";
+	    if (format_conversion.empty() && !has_hpss_staged_access) {
+	      matrix_ss << " thick-border-right";
+	    }
+	    else {
+	      matrix_ss << " thin-border-right";
+	    }
+	    matrix_ss << "\" style=\"background-color: #effee1\">&nbsp;</td>";
 	  }
-	  else {
-	    matrix_ss << " thin-border-right";
-	  }
-	  matrix_ss << "\" style=\"background-color: #effee1\">&nbsp;</td>";
 	}
 	if (!format_conversion.empty()) {
 	  matrix_ss << "<td align=\"center\" class=\"thin-border-top";
@@ -843,13 +877,13 @@ int main(int argc,char **argv)
   std::string access_type;
 // verify that the user is authorized to view the data access matrix
   verify_authorization(doc_root,ruser,access_type);
-  std::string webhome;
+  std::string webhome, locflag;
   SpanData span_data;
 // get information about web-accessible files
-  get_web_data(webhome,span_data);
+  get_web_data(webhome, locflag, span_data);
   std::stringstream matrix_ss;
 // build the data access matrix
-  build_matrix(doc_root,webhome,ruser,access_type,span_data,matrix_ss);
+  build_matrix(doc_root,webhome, locflag, ruser,access_type,span_data,matrix_ss);
   server.disconnect();
 // send the matrix as the response
   std::cout << matrix_ss.str();
