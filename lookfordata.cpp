@@ -40,7 +40,7 @@ struct DsEntry {
 my::map<DsEntry> prev_results_table(999);
 const size_t EXPANDABLE_SUMMARY_LENGTH=30;
 std::string bgcolors[2];
-std::string http_host=getenv("HTTP_HOST");
+std::string http_host;
 std::string server_root="/"+strutils::token(unixutils::host_name(),".",0);
 std::ofstream cache;
 struct BreadCrumbsEntry {
@@ -1508,7 +1508,7 @@ void compare()
   metautils::read_config("lookfordata","","");
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   if (local_args.url_input.compare_list.size() < 2) {
-    web_error("bad query");
+    web_error2("bad query","400 Bad Request");
   }
   it=local_args.url_input.compare_list.begin();
   ce1.key=*it;
@@ -1714,8 +1714,8 @@ void compare()
     }
     std::cout << "</td></tr>" << std::endl;
   }
-  table1="ObML.ds"+strutils::substitute(ce1.key,".","")+"_primaries";
-  table2="ObML.ds"+strutils::substitute(ce2.key,".","")+"_primaries";
+  table1="ObML.ds"+strutils::substitute(ce1.key,".","")+"_primaries2";
+  table2="ObML.ds"+strutils::substitute(ce2.key,".","")+"_primaries2";
   if (table_exists(server,table1) || table_exists(server,table2)) {
   }
   server.disconnect();
@@ -1723,6 +1723,16 @@ void compare()
 
 int main(int argc,char **argv)
 {
+  char *env;
+  if ( (env=getenv("HTTP_HOST")) != nullptr) {
+    http_host=env;
+    if (http_host.empty()) {
+	web_error2("empty HTTP_HOST","400 Bad Request");
+    }
+  }
+  else {
+    web_error2("missing HTTP_HOST","400 Bad Request");
+  }
   parse_query();
   if (local_args.display_cache) {
     display_cache();
