@@ -11,10 +11,20 @@
 #include <search.hpp>
 #include <bsort.hpp>
 
+using std::cout;
+using std::endl;
+using std::regex;
+using std::regex_search;
+using std::shared_ptr;
+using std::stoi;
+using std::string;
+using std::stringstream;
+using std::vector;
+
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
-std::string myerror = "";
-std::string mywarning = "";
+string myerror = "";
+string mywarning = "";
 
 struct LocalArgs {
   LocalArgs() : url_input(), lkey(), new_browse(false), display_cache(false) { }
@@ -24,42 +34,42 @@ struct LocalArgs {
         browse_value_list(), compare_list(), origin(), from_home_page(),
         refine_color() { }
 
-    std::string refine_by, browse_by, browse_value;
-    std::list<std::string> browse_by_list, browse_value_list, compare_list;
-    std::string origin, from_home_page, refine_color;
+    string refine_by, browse_by, browse_value;
+    std::list<string> browse_by_list, browse_value_list, compare_list;
+    string origin, from_home_page, refine_color;
   };
 
   UrlInput url_input;
-  std::string lkey;
+  string lkey;
   bool new_browse, display_cache;
 } local_args;
 
 struct DsEntry {
   DsEntry() : key(), summary() { }
 
-  std::string key;
-  std::string summary;
+  string key;
+  string summary;
 };
 
 struct BreadCrumbsEntry {
   BreadCrumbsEntry() : key(), count(nullptr) { }
 
-  std::string key;
-  std::shared_ptr<std::string> count;
+  string key;
+  shared_ptr<string> count;
 };
 
 struct CountEntry {
   CountEntry() : key(), count(nullptr) { }
 
-  std::string key;
-  std::shared_ptr<int> count;
+  string key;
+  shared_ptr<int> count;
 };
 
 struct TimeResolution {
   TimeResolution() : key(), types(nullptr) { }
 
-  std::string key;
-  std::shared_ptr<std::string> types;
+  string key;
+  shared_ptr<string> types;
 };
 
 struct ComparisonEntry {
@@ -67,25 +77,25 @@ struct ComparisonEntry {
       order(0), time_resolution_table(), data_types(), formats(),
       grid_resolutions(), projects(), supported_projects(), platforms() { }
 
-  std::string key;
-  std::string title, summary, type;
-  std::string start, end;
+  string key;
+  string title, summary, type;
+  string start, end;
   size_t order;
   my::map<TimeResolution> time_resolution_table;
-  std::list<std::string> data_types, formats, grid_resolutions, projects,
+  std::list<string> data_types, formats, grid_resolutions, projects,
       supported_projects, platforms;
 };
 
 struct StringEntry {
   StringEntry() : key() { }
 
-  std::string key;
+  string key;
 };
 
 struct GridProducts {
   GridProducts() : table(), found_analyses(false), tables(), tid(0) { }
 
-  std::string table;
+  string table;
   bool found_analyses;
   struct Tables {
     Tables() : forecast(99999), average(99999), accumulation(99999),
@@ -101,44 +111,44 @@ struct GridProducts {
 struct GridCoverages {
   GridCoverages() : table(), dsnum(), coverages(), tid(0) { }
 
-  std::string table, dsnum;
-  std::list<std::string> coverages;
+  string table, dsnum;
+  std::list<string> coverages;
   pthread_t tid;
 };
 
 struct CatEntry {
   CatEntry() : key(), count() { }
 
-  std::string key;
-  std::string count;
+  string key;
+  string count;
 };
 
-const std::string SERVER_ROOT = "/" + strutils::token(unixutils::host_name(),
+const string SERVER_ROOT = "/" + strutils::token(unixutils::host_name(),
     ".", 0);
-const std::string INDEXABLE_DATASET_CONDITIONS = "(d.type = 'P' or d.type = "
+const string INDEXABLE_DATASET_CONDITIONS = "(d.type = 'P' or d.type = "
     "'H') and d.dsid < '999.0'";
 const size_t EXPANDABLE_SUMMARY_LENGTH = 30;
 my::map<DsEntry> prev_results_table(999);
 my::map<BreadCrumbsEntry> breadcrumbs_table;
-std::string http_host;
+string http_host;
 std::ofstream cache;
 
-bool compare_strings(std::string& left,std::string& right) {
+bool compare_strings(string& left,string& right) {
   return (left < right);
 }
 
-bool sort_nhour_keys(const std::string& left,const std::string& right) {
-  std::string l=left;
-  std::string r=right;
+bool sort_nhour_keys(const string& left,const string& right) {
+  string l=left;
+  string r=right;
   int n;
 
-  if (l.find("-hour") == std::string::npos) {
+  if (l.find("-hour") == string::npos) {
     l="0-hour"+l;
   }
   if ( (n=3-l.find("-hour")) > 0) {
     l.insert(0,n,'0');
   }
-  if (r.find("-hour") == std::string::npos) {
+  if (r.find("-hour") == string::npos) {
     r="0-hour"+r;
   }
   if ( (n=3-r.find("-hour")) > 0) {
@@ -154,7 +164,7 @@ extern "C" void *thread_summarize_grid_products(void *gpstruct) {
   MySQL::Query query;
   MySQL::Row row;
   GridProducts *g=(GridProducts *)gpstruct;
-  std::string sdum;
+  string sdum;
   size_t fidx,aidx,cidx,zidx;
   StringEntry se;
 
@@ -169,14 +179,14 @@ extern "C" void *thread_summarize_grid_products(void *gpstruct) {
       cidx=sdum.find("-hour Accumulation");
       if (sdum == "Analysis") {
         g->found_analyses=true;
-      } else if (fidx != std::string::npos && fidx < 4) {
+      } else if (fidx != string::npos && fidx < 4) {
 
         // forecasts
         se.key=sdum.substr(0,sdum.find(" "));
         if (!g->tables.forecast.found(se.key,se)) {
           g->tables.forecast.insert(se);
         }
-      } else if (aidx != std::string::npos) {
+      } else if (aidx != string::npos) {
 
         // averages
         se.key=sdum.substr(0,aidx);
@@ -184,35 +194,35 @@ extern "C" void *thread_summarize_grid_products(void *gpstruct) {
         if (!g->tables.average.found(se.key,se)) {
           g->tables.average.insert(se);
         }
-      } else if (cidx != std::string::npos && cidx < 4) {
+      } else if (cidx != string::npos && cidx < 4) {
 
         // accumulations
         se.key=sdum.substr(0,sdum.find(" "));
         if (!g->tables.accumulation.found(se.key,se)) {
           g->tables.accumulation.insert(se);
         }
-      } else if (std::regex_search(sdum,std::regex("^Weekly Mean"))) {
+      } else if (regex_search(sdum,regex("^Weekly Mean"))) {
         se.key=sdum.substr(sdum.find("of")+3);
         if (!g->tables.weekly_mean.found(se.key,se)) {
           g->tables.weekly_mean.insert(se);
         }
-      } else if (std::regex_search(sdum,std::regex("^Monthly Mean"))) {
-        if ( (zidx=sdum.find("of")) != std::string::npos) {
+      } else if (regex_search(sdum,regex("^Monthly Mean"))) {
+        if ( (zidx=sdum.find("of")) != string::npos) {
           se.key=sdum.substr(zidx+3);
           strutils::trim(se.key);
           if (!g->tables.monthly_mean.found(se.key,se)) {
             g->tables.monthly_mean.insert(se);
           }
         }
-      } else if (std::regex_search(sdum,std::regex("Mean"))) {
+      } else if (regex_search(sdum,regex("Mean"))) {
         se.key="x";
-        if ( (zidx=sdum.find("of")) != std::string::npos) {
+        if ( (zidx=sdum.find("of")) != string::npos) {
           se.key=sdum.substr(zidx+3);
-          if ( (zidx=se.key.find("at")) != std::string::npos) {
+          if ( (zidx=se.key.find("at")) != string::npos) {
             se.key=se.key.substr(0,zidx);
           }
         } else {
-          if ( (zidx=sdum.find("Mean")) != std::string::npos) {
+          if ( (zidx=sdum.find("Mean")) != string::npos) {
             se.key=sdum.substr(0,zidx);
           }
         }
@@ -220,7 +230,7 @@ extern "C" void *thread_summarize_grid_products(void *gpstruct) {
         if (!g->tables.mean.found(se.key,se)) {
           g->tables.mean.insert(se);
         }
-      } else if (std::regex_search(sdum,std::regex("^Variance/Covariance"))) {
+      } else if (regex_search(sdum,regex("^Variance/Covariance"))) {
         se.key=sdum.substr(sdum.find("of")+3);
         se.key=se.key.substr(se.key.find(" ")+1);
         se.key=se.key.substr(0,se.key.find("at")-1);
@@ -255,8 +265,8 @@ extern "C" void *thread_summarize_grid_coverages(void *gcstruct) {
   return NULL;
 }
 
-std::string category(std::string short_name) {
-  std::string long_name;
+string category(string short_name) {
+  string long_name;
 
   if (short_name == "var") {
     long_name="Variable / Parameter";
@@ -303,19 +313,19 @@ void read_cache() {
   char line[256];
   DsEntry dse;
   BreadCrumbsEntry bce;
-  std::string rmatch,bmatch;
+  string rmatch,bmatch;
   int nmatch=0,n=0;
   int num_lines=0;
   TempFile *tfile=NULL;
-  std::deque<std::string> sp;
+  std::deque<string> sp;
 
   ifs.open((SERVER_ROOT+"/tmp/browse."+local_args.lkey).c_str());
   if (ifs.is_open()) {
-    if (std::regex_search(local_args.url_input.refine_by,std::regex("^@"))) {
+    if (regex_search(local_args.url_input.refine_by,regex("^@"))) {
       sp=strutils::split(local_args.url_input.refine_by,"-");
       rmatch=sp[0];
       if (sp.size() > 1) {
-        nmatch=std::stoi(sp[1]);
+        nmatch=stoi(sp[1]);
       } else {
         nmatch=1;
       }
@@ -336,13 +346,13 @@ void read_cache() {
             }
           }
         } else if (!bmatch.empty()) {
-          if (std::regex_search(line,std::regex("^"+bmatch))) {
+          if (regex_search(line,regex("^"+bmatch))) {
             break;
           }
         }
         bce.key=sp[0].substr(1)+"<!>"+sp[1];
         if (!breadcrumbs_table.found(bce.key,bce)) {
-          bce.count.reset(new std::string);
+          bce.count.reset(new string);
           *bce.count=sp[2];
           breadcrumbs_table.insert(bce);
         }
@@ -362,20 +372,20 @@ void read_cache() {
       num_lines--;
       for (n=0; n < num_lines; n++) {
         ifs.getline(line,256);
-        ofs << line << std::endl;
+        ofs << line << endl;
       }
       ofs.close();
     }
     ifs.close();
     if (tfile != NULL) {
-      std::stringstream oss,ess;
+      stringstream oss,ess;
       unixutils::mysystem2("/bin/mv "+tfile->name()+" "+SERVER_ROOT+"/tmp/browse."+local_args.lkey,oss,ess);
     }
   }
 }
 
 void redirect_to_error() {
-  std::cout << "Location: /index.html?hash=error&code=404" << std::endl << std::endl;
+  cout << "Location: /index.html?hash=error&code=404" << endl << endl;
   exit(1);
 }
 
@@ -425,7 +435,7 @@ void parse_query() {
       system(("rm -f "+SERVER_ROOT+"/tmp/browse."+local_args.lkey).c_str());
     }
     local_args.lkey=strutils::strand(30);
-    std::cout << "Set-Cookie: lkey=" << local_args.lkey << "; domain=" << http_host << "; path=/;" << std::endl;
+    cout << "Set-Cookie: lkey=" << local_args.lkey << "; domain=" << http_host << "; path=/;" << endl;
   }
 }
 
@@ -476,23 +486,23 @@ void parse_refine_query(MySQL::Query& query) {
           if (prev_results_table.size() > 0) {
             ++(*ce.count);
           } else {
-            (*ce.count)+=std::stoi(row[1]);
+            (*ce.count)+=stoi(row[1]);
           }
         }
       }
     }
   }
-  std::cout << "Content-type: text/html" << std::endl << std::endl;
-  std::cout << "<div style=\"background-color: #27aae0\">";
+  cout << "Content-type: text/html" << endl << endl;
+  cout << "<div style=\"background-color: #27aae0\">";
   if (local_args.url_input.from_home_page != "yes") {
-    std::cout << "<div style=\"font-size: 16px; font-weight: bold; padding: 2px; text-align: center; width: auto; height: 20px; line-height: 20px\">" << category(local_args.url_input.refine_by) << "</div>";
+    cout << "<div style=\"font-size: 16px; font-weight: bold; padding: 2px; text-align: center; width: auto; height: 20px; line-height: 20px\">" << category(local_args.url_input.refine_by) << "</div>";
   }
   if (keyword_count_table.size() > 0) {
     if (local_args.url_input.refine_by.substr(1) != "res") {
       keyword_count_table.keysort(
-      [](std::string& left,std::string& right) -> bool
+      [](string& left,string& right) -> bool
       {
-        std::string l,r;
+        string l,r;
 
         if (left == "Not specified") {
           return true;
@@ -512,43 +522,43 @@ void parse_refine_query(MySQL::Query& query) {
     for (const auto& key : keyword_count_table.keys()) {
       CountEntry ce;
       keyword_count_table.found(key,ce);
-      std::cout << "<div style=\"background-color: " << local_args.url_input.refine_color << "; margin-bottom: 1px\"><table style=\"font-size: 13px\"><tr valign=\"top\"><td>&nbsp;&bull;</td><td>";
+      cout << "<div style=\"background-color: " << local_args.url_input.refine_color << "; margin-bottom: 1px\"><table style=\"font-size: 13px\"><tr valign=\"top\"><td>&nbsp;&bull;</td><td>";
       if (local_args.url_input.from_home_page == "yes") {
-        std::cout << "<a href=\"/index.html#!lfd?b=" << local_args.url_input.refine_by << "&v=" << key << "\" onClick=\"javascript:slideUp('refine-slider')\">";
+        cout << "<a href=\"/index.html#!lfd?b=" << local_args.url_input.refine_by << "&v=" << key << "\" onClick=\"javascript:slideUp('refine-slider')\">";
       } else {
-        std::cout << "<a href=\"javascript:void(0)\" onClick=\"javascript:slideIn('refine-slider',function(){ document.getElementById(lastoutid).style.fontWeight='normal'; });getContent('lfd-content','/cgi-bin/lookfordata?b=" << local_args.url_input.refine_by << "&v=" << key << "')\">";
+        cout << "<a href=\"javascript:void(0)\" onClick=\"javascript:slideIn('refine-slider',function(){ document.getElementById(lastoutid).style.fontWeight='normal'; });getContent('lfd-content','/cgi-bin/lookfordata?b=" << local_args.url_input.refine_by << "&v=" << key << "')\">";
       }
       if (local_args.url_input.refine_by == "proj" || local_args.url_input.refine_by == "supp") {
         size_t idx;
-        if ( (idx=key.find(">")) != std::string::npos) {
-          std::cout << "<b>" << key.substr(0,idx) << "</b>" << key.substr(idx);
+        if ( (idx=key.find(">")) != string::npos) {
+          cout << "<b>" << key.substr(0,idx) << "</b>" << key.substr(idx);
         } else {
 //          if (key == "Not specified") {
-            std::cout << key;
+            cout << key;
 /*
           } else {
-            std::cout << "<b>" << key << "</b>";
+            cout << "<b>" << key << "</b>";
           }
 */
         }
       } else if (local_args.url_input.refine_by == "fmt") {
         auto fmt=strutils::substitute(key,"proprietary_","");
-        std::cout << strutils::to_capital(fmt);
+        cout << strutils::to_capital(fmt);
       } else {
         if (key == strutils::to_upper(key)) {
-          std::cout << strutils::capitalize(key);
+          cout << strutils::capitalize(key);
         } else {
-          std::cout << key;
+          cout << key;
         }
       }
-      std::cout << "</a> <small class=\"mediumGrayText\">(" << *(ce.count) << ")</small>" << "</td></tr></table></div>" << std::endl;
+      cout << "</a> <small class=\"mediumGrayText\">(" << *(ce.count) << ")</small>" << "</td></tr></table></div>" << endl;
     }
-    std::cout << "<div style=\"background-color: " << local_args.url_input.refine_color << "; line-height: 1px\">&nbsp;</div>";
-    std::cout << std::endl;
+    cout << "<div style=\"background-color: " << local_args.url_input.refine_color << "; line-height: 1px\">&nbsp;</div>";
+    cout << endl;
   } else {
-    std::cout << "<div style=\"background-color: " << local_args.url_input.refine_color << "; margin-top: 1px\"><table style=\"font-size: 13px\"><tr><td>&nbsp;&nbsp;</td><td>No additional options are available</td></tr></table></div>" << std::endl;
+    cout << "<div style=\"background-color: " << local_args.url_input.refine_color << "; margin-top: 1px\"><table style=\"font-size: 13px\"><tr><td>&nbsp;&nbsp;</td><td>No additional options are available</td></tr></table></div>" << endl;
   }
-  std::cout << "</div>" << std::endl;
+  cout << "</div>" << endl;
   server.disconnect();
 }
 
@@ -627,11 +637,11 @@ void show_refine_results() {
       query.set("select continuing_update,count(distinct dsid) from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS+" group by continuing_update");
     }
   } else if (local_args.url_input.refine_by == "ftext") {
-    std::cout << "Content-type: text/html" << std::endl << std::endl;
-    std::cout << "<div style=\"padding: 5px 0px 0px 5px\"><form name=\"fts\" action=\"javascript:void(0)\" onSubmit=\"javascript:if (v.value.length == 0) { alert('Please enter one or more free text keywords to search on'); return false; } else { slideIn('refine-slider',function(){ document.getElementById(lastoutid).style.fontWeight='normal'; }); getContent('lfd-content','/cgi-bin/lookfordata?b='+document.fts.b.value+'&v='+document.fts.v.value); return true; }\"><span class=\"fs14px\">Filter the dataset list by entering one or more keywords.  If you preceed a keyword with a minus sign (e.g. <nobr><span class=\"fixedWidth14\">-temperature</span></nobr>), then datasets containing that keyword will be excluded.  Otherwise, datasets containing your keyword(s) will be included in the filtered list.</span><br /><input class=\"fixedWidth12\" type=\"text\" name=\"v\" value=\"keyword(s)\" size=\"25\" onClick=\"javascript:this.value=''\" /><input type=\"hidden\" name=\"b\" value=\"ftext\" /><br /><input type=\"submit\" /></form></div>" << std::endl;
+    cout << "Content-type: text/html" << endl << endl;
+    cout << "<div style=\"padding: 5px 0px 0px 5px\"><form name=\"fts\" action=\"javascript:void(0)\" onSubmit=\"javascript:if (v.value.length == 0) { alert('Please enter one or more free text keywords to search on'); return false; } else { slideIn('refine-slider',function(){ document.getElementById(lastoutid).style.fontWeight='normal'; }); getContent('lfd-content','/cgi-bin/lookfordata?b='+document.fts.b.value+'&v='+document.fts.v.value); return true; }\"><span class=\"fs14px\">Filter the dataset list by entering one or more keywords.  If you preceed a keyword with a minus sign (e.g. <nobr><span class=\"fixedWidth14\">-temperature</span></nobr>), then datasets containing that keyword will be excluded.  Otherwise, datasets containing your keyword(s) will be included in the filtered list.</span><br /><input class=\"fixedWidth12\" type=\"text\" name=\"v\" value=\"keyword(s)\" size=\"25\" onClick=\"javascript:this.value=''\" /><input type=\"hidden\" name=\"b\" value=\"ftext\" /><br /><input type=\"submit\" /></form></div>" << endl;
     exit(0);
   }
-//std::cerr << query.show() << std::endl;
+//std::cerr << query.show() << endl;
   if (query) {
     parse_refine_query(query);
   } else {
@@ -650,12 +660,12 @@ void open_cache_for_writing() {
 void add_breadcrumbs(size_t num_results) {
   my::map<CountEntry> count_table;
   CountEntry ce;
-  std::string breadcrumbs="Showing datasets with these attributes: ";
-  std::cout << "<div id=\"breadcrumbs\" style=\"background-color: #9cc991; padding: 5px; margin-top: 3px; margin-bottom: 10px; font-size: 13px\">" << breadcrumbs;
+  string breadcrumbs="Showing datasets with these attributes: ";
+  cout << "<div id=\"breadcrumbs\" style=\"background-color: #9cc991; padding: 5px; margin-top: 3px; margin-bottom: 10px; font-size: 13px\">" << breadcrumbs;
   auto n=0;
   for (const auto& key : breadcrumbs_table.keys()) {
     if (n > 0) {
-      std::cout << " <b>&gt;</b> ";
+      cout << " <b>&gt;</b> ";
     }
     BreadCrumbsEntry bce;
     breadcrumbs_table.found(key,bce);
@@ -666,7 +676,7 @@ void add_breadcrumbs(size_t num_results) {
     } else if (kparts[0] == "ftext") {
       bval="'"+bval+"'";
     }
-    std::cout << "<a style=\"font-weight: bold; padding-left: 5px\" href=\"javascript:void(0)\" onClick=\"javascript:document.getElementById('breadcrumbs').innerHTML='"+breadcrumbs+"';slideOutFrom('" << kparts[0];
+    cout << "<a style=\"font-weight: bold; padding-left: 5px\" href=\"javascript:void(0)\" onClick=\"javascript:document.getElementById('breadcrumbs').innerHTML='"+breadcrumbs+"';slideOutFrom('" << kparts[0];
     if (n > 0) {
       breadcrumbs+=" <b>&gt;</b> ";
     }
@@ -679,14 +689,14 @@ void add_breadcrumbs(size_t num_results) {
     } else {
       ++(*ce.count);
     }
-    std::cout << "-" << *ce.count << "','')\"><nobr>" << category(kparts[0]) << "</nobr></a> : " << bval << " <span class=\"mediumGrayText\">(" << *bce.count << ")</span>";
+    cout << "-" << *ce.count << "','')\"><nobr>" << category(kparts[0]) << "</nobr></a> : " << bval << " <span class=\"mediumGrayText\">(" << *bce.count << ")</span>";
     breadcrumbs+="-"+strutils::itos(*ce.count)+"\\',\\'\\')&quot;><nobr>"+category(kparts[0])+"</nobr></a> : "+bval+" <span class=&quot;mediumGrayText&quot;>("+*bce.count+")</span>";
     ++n;
   }
   if (n > 0) {
-    std::cout << " <b>&gt;</b> ";
+    cout << " <b>&gt;</b> ";
   }
-  std::cout << "<a style=\"font-weight: bold; padding-left: 5px\" href=\"javascript:void(0)\" onClick=\"javascript:document.getElementById('breadcrumbs').innerHTML='"+breadcrumbs+"';slideOutFrom('" << local_args.url_input.browse_by;
+  cout << "<a style=\"font-weight: bold; padding-left: 5px\" href=\"javascript:void(0)\" onClick=\"javascript:document.getElementById('breadcrumbs').innerHTML='"+breadcrumbs+"';slideOutFrom('" << local_args.url_input.browse_by;
   if (!count_table.found(local_args.url_input.browse_by,ce)) {
     ce.key=local_args.url_input.browse_by;
     ce.count.reset(new int);
@@ -695,44 +705,44 @@ void add_breadcrumbs(size_t num_results) {
   } else {
     ++(*ce.count);
   }
-  std::cout << "-" << *ce.count << "','')\"><nobr>" << category(local_args.url_input.browse_by) << "</nobr></a> : ";
+  cout << "-" << *ce.count << "','')\"><nobr>" << category(local_args.url_input.browse_by) << "</nobr></a> : ";
   if (local_args.url_input.browse_by == "var" || local_args.url_input.browse_by == "type") {
-    std::cout << strutils::capitalize(local_args.url_input.browse_value);
+    cout << strutils::capitalize(local_args.url_input.browse_value);
   } else if (local_args.url_input.browse_by == "ftext") {
-    std::cout << "'" << local_args.url_input.browse_value << "'";
+    cout << "'" << local_args.url_input.browse_value << "'";
   } else {
-    std::cout << local_args.url_input.browse_value;
+    cout << local_args.url_input.browse_value;
   }
-  std::cout << " <span class=\"mediumGrayText\">(" << num_results << ")</span>";
-  std::cout << "</div>" << std::endl;
+  cout << " <span class=\"mediumGrayText\">(" << num_results << ")</span>";
+  cout << "</div>" << endl;
   if (num_results > 1) {
-    std::cout << "<script id=\"dscompare\" language=\"javascript\">" << std::endl;
-    std::cout << "function submitCompare() {" << std::endl;
-    std::cout << "  var parameters='';" << std::endl;
-    std::cout << "  var num_checked=0;" << std::endl;
-    std::cout << "  for (n=0; n < document.compare.elements.length; n++) {" << std::endl;
-    std::cout << "    if (document.compare.elements[n].checked) {" << std::endl;
-    std::cout << "      parameters+='&cmp='+document.compare.elements[n].value;" << std::endl;
-    std::cout << "      num_checked++;" << std::endl;
-    std::cout << "    }" << std::endl;
-    std::cout << "  }" << std::endl;
-    std::cout << "  if (num_checked > 2) {" << std::endl;
-    std::cout << "    alert(\"You can only compare two datasets.  Please uncheck all but two checkboxes.\");" << std::endl;
-    std::cout << "    return;" << std::endl;
-    std::cout << "  } else if (num_checked < 2) {" << std::endl;
-    std::cout << "    alert(\"Please check the boxes beside two datasets that you would like to compare.\");" << std::endl;
-    std::cout << "    return;" << std::endl;
-    std::cout << "  }" << std::endl;
-    std::cout << "  location='/index.html#!lfd?'+parameters.substr(1);" << std::endl;
-    std::cout << "}" << std::endl;
-    std::cout << "</script>" << std::endl;
-    std::cout << "<div style=\"overflow: hidden; background-color: #eff5df; padding: 5px; margin-bottom: 10px\"><div style=\"display: inline; float: left; font-size: 14px\">Select two datasets and <input type=\"button\" value=\"Compare\" onClick=\"javascript:submitCompare()\"> them.</div><div style=\"display: inline; float: right; margin-right: 10px; font-size: 14px\"><input type=\"reset\" value=\"Reset\"> checkboxes</div></div>" << std::endl;
+    cout << "<script id=\"dscompare\" language=\"javascript\">" << endl;
+    cout << "function submitCompare() {" << endl;
+    cout << "  var parameters='';" << endl;
+    cout << "  var num_checked=0;" << endl;
+    cout << "  for (n=0; n < document.compare.elements.length; n++) {" << endl;
+    cout << "    if (document.compare.elements[n].checked) {" << endl;
+    cout << "      parameters+='&cmp='+document.compare.elements[n].value;" << endl;
+    cout << "      num_checked++;" << endl;
+    cout << "    }" << endl;
+    cout << "  }" << endl;
+    cout << "  if (num_checked > 2) {" << endl;
+    cout << "    alert(\"You can only compare two datasets.  Please uncheck all but two checkboxes.\");" << endl;
+    cout << "    return;" << endl;
+    cout << "  } else if (num_checked < 2) {" << endl;
+    cout << "    alert(\"Please check the boxes beside two datasets that you would like to compare.\");" << endl;
+    cout << "    return;" << endl;
+    cout << "  }" << endl;
+    cout << "  location='/index.html#!lfd?'+parameters.substr(1);" << endl;
+    cout << "}" << endl;
+    cout << "</script>" << endl;
+    cout << "<div style=\"overflow: hidden; background-color: #eff5df; padding: 5px; margin-bottom: 10px\"><div style=\"display: inline; float: left; font-size: 14px\">Select two datasets and <input type=\"button\" value=\"Compare\" onClick=\"javascript:submitCompare()\"> them.</div><div style=\"display: inline; float: right; margin-right: 10px; font-size: 14px\"><input type=\"reset\" value=\"Reset\"> checkboxes</div></div>" << endl;
   }
 }
 
 void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entries,bool display_results) {
   MySQL::Row row;
-  std::string sdum;
+  string sdum;
   size_t num_results=0,iterator;
   DsEntry dse;
   int n=0;
@@ -758,11 +768,11 @@ void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entr
     }
   }
   open_cache_for_writing();
-  cache << "@" << local_args.url_input.browse_by << "<!>" << local_args.url_input.browse_value << "<!>" << num_results << std::endl;
+  cache << "@" << local_args.url_input.browse_by << "<!>" << local_args.url_input.browse_value << "<!>" << num_results << endl;
   if (display_results) {
-    std::cout << "Content-type: text/html" << std::endl << std::endl;
-    std::cout << "<span class=\"fs24px bold\">Browse the RDA</span><br>" << std::endl;
-    std::cout << "<form name=\"compare\" action=\"javascript:void(0)\" method=\"get\">" << std::endl;
+    cout << "Content-type: text/html" << endl << endl;
+    cout << "<span class=\"fs24px bold\">Browse the RDA</span><br>" << endl;
+    cout << "<form name=\"compare\" action=\"javascript:void(0)\" method=\"get\">" << endl;
     add_breadcrumbs(num_results);
   }
   pstmt.rewind();
@@ -772,63 +782,63 @@ void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entr
       if (!ce.key.empty()) {
         (*ce.count)=0;
       }
-      cache << row[0] << std::endl;
+      cache << row[0] << endl;
       sdum=strutils::itos(n+1);
       if (display_results) {
-        std::cout << "<div style=\"padding: 5px\" onMouseOver=\"javascript:this.style.backgroundColor='#eafaff'\" onMouseOut=\"javascript:this.style.backgroundColor='transparent'\">";
+        cout << "<div style=\"padding: 5px\" onMouseOver=\"javascript:this.style.backgroundColor='#eafaff'\" onMouseOut=\"javascript:this.style.backgroundColor='transparent'\">";
         if (row[3] == "H") {
-          std::cout << "<img src=\"/images/alert.gif\">&nbsp;<span style=\"color: red\">For ancillary use only - not recommended as a primary research dataset.  It has likely been superseded by newer and better datasets.</span><br>";
+          cout << "<img src=\"/images/alert.gif\">&nbsp;<span style=\"color: red\">For ancillary use only - not recommended as a primary research dataset.  It has likely been superseded by newer and better datasets.</span><br>";
         }
         if (num_results > 1) {
-          std::cout << "<input type=\"checkbox\" name=\"cmp\" value=\"" << row[0] << "\">&nbsp;";
+          cout << "<input type=\"checkbox\" name=\"cmp\" value=\"" << row[0] << "\">&nbsp;";
         }
-        std::cout << sdum << ". <a class=\"underline\" href=\"/datasets/ds" << row[0] << "/\" target=\"_blank\"><b>" << row[1] << "</b></a> <span class=\"mediumGrayText\">(ds" << row[0] << ")</span><br>" << std::endl;
-        std::cout << "<div class=\"browseSummary\">" << searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator) << "</div>" << std::endl;
-        std::cout << "</div><br>" << std::endl;
+        cout << sdum << ". <a class=\"underline\" href=\"/datasets/ds" << row[0] << "/\" target=\"_blank\"><b>" << row[1] << "</b></a> <span class=\"mediumGrayText\">(ds" << row[0] << ")</span><br>" << endl;
+        cout << "<div class=\"browseSummary\">" << searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator) << "</div>" << endl;
+        cout << "</div><br>" << endl;
         ++n;
       }
     }
   }
   cache.close();
   if (display_results) {
-    std::cout << "</form>" << std::endl;
-    std::cout << "</body></html>" << std::endl;
+    cout << "</form>" << endl;
+    cout << "</body></html>" << endl;
   }
 }
 
 void show_datasets_from_query(MySQL::PreparedStatement& pstmt,bool display_results) {
   MySQL::Row row;
-  std::string sdum;
+  string sdum;
   int n=0;
   size_t iterator;
 
   open_cache_for_writing();
-  cache << "@" << local_args.url_input.browse_by << "<!>" << local_args.url_input.browse_value << "<!>" << pstmt.num_rows() << std::endl;
+  cache << "@" << local_args.url_input.browse_by << "<!>" << local_args.url_input.browse_value << "<!>" << pstmt.num_rows() << endl;
   if (display_results) {
-    std::cout << "Content-type: text/html" << std::endl << std::endl;
-    std::cout << "<span class=\"fs24px bold\">Browse the RDA</span><br>" << std::endl;
-    std::cout << "<form name=\"compare\" action=\"javascript:void(0)\">" << std::endl;
+    cout << "Content-type: text/html" << endl << endl;
+    cout << "<span class=\"fs24px bold\">Browse the RDA</span><br>" << endl;
+    cout << "<form name=\"compare\" action=\"javascript:void(0)\">" << endl;
     add_breadcrumbs(pstmt.num_rows());
   }
   while (pstmt.fetch_row(row)) {
-    cache << row[0] << std::endl;
+    cache << row[0] << endl;
     if (display_results) {
       sdum=strutils::itos(n+1);
-      std::cout << "<div style=\"padding: 5px\" onMouseOver=\"javascript:this.style.backgroundColor='#eafaff'\" onMouseOut=\"javascript:this.style.backgroundColor='transparent'\" itemscope itemtype=\"http://schema.org/Dataset\">";
+      cout << "<div style=\"padding: 5px\" onMouseOver=\"javascript:this.style.backgroundColor='#eafaff'\" onMouseOut=\"javascript:this.style.backgroundColor='transparent'\" itemscope itemtype=\"http://schema.org/Dataset\">";
       if (row[3] == "H") {
-        std::cout << "<img src=\"/images/alert.gif\">&nbsp;<span style=\"color: red\">For ancillary use only - not recommended as a primary research dataset.  It has likely been superseded by newer and better datasets.</span><br>";
+        cout << "<img src=\"/images/alert.gif\">&nbsp;<span style=\"color: red\">For ancillary use only - not recommended as a primary research dataset.  It has likely been superseded by newer and better datasets.</span><br>";
       }
       if (pstmt.num_rows() > 1) {
-        std::cout << "<input type=\"checkbox\" name=\"cmp\" value=\""+row[0]+"\">&nbsp;";
+        cout << "<input type=\"checkbox\" name=\"cmp\" value=\""+row[0]+"\">&nbsp;";
       }
-      std::cout << sdum+". <a class=\"underline\" href=\"/datasets/ds"+row[0]+"/\" target=\"_blank\" itemprop=\"url\"><b itemprop=\"name\">"+row[1]+"</b></a> <span class=\"mediumGrayText\">(ds"+row[0]+")</span><br>" << std::endl;
-      std::cout << "<div class=\"browseSummary\" itemprop=\"description\">"+searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator)+"</div>" << std::endl;
-      std::cout << "</div><br>" << std::endl;
+      cout << sdum+". <a class=\"underline\" href=\"/datasets/ds"+row[0]+"/\" target=\"_blank\" itemprop=\"url\"><b itemprop=\"name\">"+row[1]+"</b></a> <span class=\"mediumGrayText\">(ds"+row[0]+")</span><br>" << endl;
+      cout << "<div class=\"browseSummary\" itemprop=\"description\">"+searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator)+"</div>" << endl;
+      cout << "</div><br>" << endl;
       ++n;
     }
   }
   if (display_results) {
-    std::cout << "</form>" << std::endl;
+    cout << "</form>" << endl;
   }
   cache.close();
 }
@@ -838,27 +848,27 @@ void browse(bool display_results = true) {
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   int num_entries=0;
   MySQL::PreparedStatement pstmt;
-  std::string pstmt_error;
+  string pstmt_error;
   bool pstmt_good=false;
   if (local_args.url_input.browse_by == "var") {
-    pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword left join search.datasets as d on d.dsid = v.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.path like concat('% > ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value},pstmt,pstmt_error);
+    pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword left join search.datasets as d on d.dsid = v.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.path like concat('% > ',?) group by d.dsid order by d.type,trank",vector<enum_field_types>{MYSQL_TYPE_STRING},vector<string>{local_args.url_input.browse_value},pstmt,pstmt_error);
   } else if (local_args.url_input.browse_by == "tres") {
     if (local_args.url_input.browse_value == "Not specified") {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.time_resolutions as r on r.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(r.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.time_resolutions as r on r.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(r.keyword) group by d.dsid order by d.type,trank",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     } else {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.time_resolutions as r left join search.datasets as d on d.dsid = r.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and r.keyword = concat('T : ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{strutils::substitute(local_args.url_input.browse_value," to "," - ")},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.time_resolutions as r left join search.datasets as d on d.dsid = r.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and r.keyword = concat('T : ',?) group by d.dsid order by d.type,trank",vector<enum_field_types>{MYSQL_TYPE_STRING},vector<string>{strutils::substitute(local_args.url_input.browse_value," to "," - ")},pstmt,pstmt_error);
     }
   } else if (local_args.url_input.browse_by == "plat") {
     if (local_args.url_input.browse_value == "Not specified") {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.platforms_new as p on p.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(p.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.platforms_new as p on p.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(p.keyword) group by d.dsid order by d.type,trank",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     } else {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.platforms_new as p left join search.GCMD_platforms as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?)) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING,MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value,local_args.url_input.browse_value},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.platforms_new as p left join search.GCMD_platforms as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?)) group by d.dsid order by d.type,trank",vector<enum_field_types>{MYSQL_TYPE_STRING,MYSQL_TYPE_STRING},vector<string>{local_args.url_input.browse_value,local_args.url_input.browse_value},pstmt,pstmt_error);
     }
   } else if (local_args.url_input.browse_by == "sres") {
     if (local_args.url_input.browse_value == "Not specified") {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.grid_resolutions as g on g.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(g.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.grid_resolutions as g on g.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(g.keyword) group by d.dsid order by d.type,trank",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     } else {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.grid_resolutions as g left join search.datasets as d on d.dsid = g.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.keyword = concat('H : ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{strutils::substitute(local_args.url_input.browse_value," to "," - ")},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.grid_resolutions as g left join search.datasets as d on d.dsid = g.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.keyword = concat('H : ',?) group by d.dsid order by d.type,trank",vector<enum_field_types>{MYSQL_TYPE_STRING},vector<string>{strutils::substitute(local_args.url_input.browse_value," to "," - ")},pstmt,pstmt_error);
     }
   } else if (local_args.url_input.browse_by == "topic") {
     auto parts=strutils::split(local_args.url_input.browse_value," > ");
@@ -866,27 +876,27 @@ void browse(bool display_results = true) {
     if (parts.size() > 1) {
       topic_condition+=" and v.term = '"+parts[1]+"'";
     }
-    pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.GCMD_variables as v left join search.datasets as d on d.dsid = v.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and "+topic_condition+" group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+    pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.GCMD_variables as v left join search.datasets as d on d.dsid = v.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and "+topic_condition+" group by d.dsid order by d.type,trank",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
   } else if (local_args.url_input.browse_by == "proj") {
     if (local_args.url_input.browse_value == "Not specified") {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.projects_new as p on p.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(p.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.projects_new as p on p.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(p.keyword) group by d.dsid order by d.type,trank",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     } else {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.projects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?)) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING,MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value,local_args.url_input.browse_value},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.projects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?)) group by d.dsid order by d.type,trank",vector<enum_field_types>{MYSQL_TYPE_STRING,MYSQL_TYPE_STRING},vector<string>{local_args.url_input.browse_value,local_args.url_input.browse_value},pstmt,pstmt_error);
     }
   } else if (local_args.url_input.browse_by == "type") {
     if (local_args.url_input.browse_value == "Not specified") {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.data_types as y on y.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(y.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.data_types as y on y.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(y.keyword) group by d.dsid order by d.type,trank",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     } else {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.data_types as y on y.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and y.keyword = ? group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.data_types as y on y.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and y.keyword = ? group by d.dsid order by d.type,trank",vector<enum_field_types>{MYSQL_TYPE_STRING},vector<string>{local_args.url_input.browse_value},pstmt,pstmt_error);
     }
   } else if (local_args.url_input.browse_by == "supp") {
     if (local_args.url_input.browse_value == "Not specified") {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.supportedProjects_new as s on s.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(s.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.supportedProjects_new as s on s.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(s.keyword) group by d.dsid order by d.type,trank",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     } else {
-      std::vector<enum_field_types> parameter_types;
-      std::vector<std::string> parameters;
-      std::string qspec="select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = '"+local_args.url_input.browse_value+"' or g.path like '% > "+local_args.url_input.browse_value+"')";
-      std::string pstmt_spec="select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?))";
+      vector<enum_field_types> parameter_types;
+      vector<string> parameters;
+      string qspec="select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = '"+local_args.url_input.browse_value+"' or g.path like '% > "+local_args.url_input.browse_value+"')";
+      string pstmt_spec="select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?))";
       parameter_types.emplace_back(MYSQL_TYPE_STRING);
       parameters.emplace_back(local_args.url_input.browse_value);
       parameter_types.emplace_back(MYSQL_TYPE_STRING);
@@ -901,35 +911,35 @@ void browse(bool display_results = true) {
     }
   } else if (local_args.url_input.browse_by == "fmt") {
     if (local_args.url_input.browse_value == "Not specified") {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.formats as f on f.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(f.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.formats as f on f.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(f.keyword) group by d.dsid order by d.type,trank",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     } else {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.formats as f left join search.datasets as d on d.dsid = f.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and f.keyword = ? group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.formats as f left join search.datasets as d on d.dsid = f.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and f.keyword = ? group by d.dsid order by d.type,trank",vector<enum_field_types>{MYSQL_TYPE_STRING},vector<string>{local_args.url_input.browse_value},pstmt,pstmt_error);
     }
   } else if (local_args.url_input.browse_by == "instr") {
     if (local_args.url_input.browse_value == "Not specified") {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.instruments_new as i on i.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(i.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.instruments_new as i on i.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(i.keyword) group by d.dsid order by d.type,trank",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     } else {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.instruments_new as i left join search.GCMD_instruments as g on g.uuid = i.keyword left join search.datasets as d on d.dsid = i.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.last_in_path = ? group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.instruments_new as i left join search.GCMD_instruments as g on g.uuid = i.keyword left join search.datasets as d on d.dsid = i.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.last_in_path = ? group by d.dsid order by d.type,trank",vector<enum_field_types>{MYSQL_TYPE_STRING},vector<string>{local_args.url_input.browse_value},pstmt,pstmt_error);
     }
   } else if (local_args.url_input.browse_by == "loc") {
     if (local_args.url_input.browse_value == "Not specified") {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.locations as l on l.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(l.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.locations as l on l.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(l.keyword) group by d.dsid order by d.type,trank",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     } else {
       auto keyword=strutils::substitute(local_args.url_input.browse_value,"USA","United States Of America");
       strutils::replace_all(keyword,"'","\\'");
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.locations as l left join search.datasets as d on d.dsid = l.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and l.keyword like concat('% > ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{keyword},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.locations as l left join search.datasets as d on d.dsid = l.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and l.keyword like concat('% > ',?) group by d.dsid order by d.type,trank",vector<enum_field_types>{MYSQL_TYPE_STRING},vector<string>{keyword},pstmt,pstmt_error);
     }
   } else if (local_args.url_input.browse_by == "prog") {
     if (local_args.url_input.browse_value == "Complete") {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and d.continuing_update = 'N' group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and d.continuing_update = 'N' group by d.dsid order by d.type,trank",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     } else if (local_args.url_input.browse_value == "Continually Updated") {
-      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and d.continuing_update = 'Y' group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and d.continuing_update = 'Y' group by d.dsid order by d.type,trank",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     }
   } else if (local_args.url_input.browse_by == "ftext") {
     auto parts=strutils::split(local_args.url_input.browse_value);
-    std::string include_words,exclude_words;
-    std::vector<enum_field_types> parameter_types;
-    std::vector<std::string> parameters;
+    string include_words,exclude_words;
+    vector<enum_field_types> parameter_types;
+    vector<string> parameters;
     for (size_t n=0; n < parts.size(); ++n) {
       if (parts[n].front() == '-') {
         if (!exclude_words.empty()) {
@@ -967,19 +977,19 @@ void browse(bool display_results = true) {
     if (prev_results_table.size() > 0) {
       redirect_to_error();
     } else {
-      pstmt_good=run_prepared_statement(server,"select d.dsid,d.title,d.summary,d.type,max(mssdate) as dm from dssdb.dataset as m left join search.datasets as d on concat('ds',d.dsid) = m.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and mssdate >= '"+dateutils::current_date_time().days_subtracted(60).to_string("%Y-%m-%d")+"' group by d.dsid order by d.type,dm desc",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select d.dsid,d.title,d.summary,d.type,max(mssdate) as dm from dssdb.dataset as m left join search.datasets as d on concat('ds',d.dsid) = m.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and mssdate >= '"+dateutils::current_date_time().days_subtracted(60).to_string("%Y-%m-%d")+"' group by d.dsid order by d.type,dm desc",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     }
   } else if (local_args.url_input.browse_by == "doi") {
     if (prev_results_table.size() > 0) {
       redirect_to_error();
     } else {
-      pstmt_good=run_prepared_statement(server,"select d.dsid,d.title,d.summary,d.type from dssdb.dsvrsn as v left join search.datasets as d on concat('ds',d.dsid) = v.dsid where v.status = 'A' and (d.type = 'P' or d.type = 'H') order by d.type,d.dsid",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select d.dsid,d.title,d.summary,d.type from dssdb.dsvrsn as v left join search.datasets as d on concat('ds',d.dsid) = v.dsid where v.status = 'A' and (d.type = 'P' or d.type = 'H') order by d.type,d.dsid",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     }
   } else if (local_args.url_input.browse_by == "all") {
     if (prev_results_table.size() > 0) {
       redirect_to_error();
     } else {
-      pstmt_good=run_prepared_statement(server,"select dsid,title,summary,type from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS+" order by type,dsid",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select dsid,title,summary,type from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS+" order by type,dsid",vector<enum_field_types>{},vector<string>{},pstmt,pstmt_error);
     }
   }
   if (pstmt_good) {
@@ -990,7 +1000,7 @@ void browse(bool display_results = true) {
       show_datasets_from_query(pstmt,display_results);
     }
   } else {
-std::cerr << "LOOKFORDATA query failed with error " << pstmt_error << ": '" << pstmt.show() << "'" << std::endl;
+std::cerr << "LOOKFORDATA query failed with error " << pstmt_error << ": '" << pstmt.show() << "'" << endl;
     redirect_to_error();
   }
 }
@@ -998,16 +1008,16 @@ std::cerr << "LOOKFORDATA query failed with error " << pstmt_error << ": '" << p
 void display_cache() {
   breadcrumbs_table.clear();
   read_cache();
-  std::cout << "Content-type: text/html" << std::endl << std::endl;
-  std::cout << "<span class=\"fs24px bold\">Browse the RDA</span><br>" << std::endl;
-  std::cout << "<form name=\"compare\" action=\"javascript:void(0)\" method=\"get\">" << std::endl;
+  cout << "Content-type: text/html" << endl << endl;
+  cout << "<span class=\"fs24px bold\">Browse the RDA</span><br>" << endl;
+  cout << "<form name=\"compare\" action=\"javascript:void(0)\" method=\"get\">" << endl;
   auto bparts=strutils::split(breadcrumbs_table.keys().back(),"<!>");
   local_args.url_input.browse_by=bparts[0];
   local_args.url_input.browse_value=bparts[1];
   breadcrumbs_table.remove(breadcrumbs_table.keys().back());
   auto num_results=prev_results_table.size();
   add_breadcrumbs(num_results);
-  std::string qstring;
+  string qstring;
   for (const auto& key : prev_results_table.keys()) {
     if (!qstring.empty()) {
       qstring+=",";
@@ -1023,20 +1033,20 @@ void display_cache() {
     size_t iterator;
     while (query.fetch_row(row)) {
       auto snum=strutils::itos(n+1);
-      std::cout << "<div style=\"padding: 5px\" onMouseOver=\"javascript:this.style.backgroundColor='#eafaff'\" onMouseOut=\"javascript:this.style.backgroundColor='transparent'\">";
+      cout << "<div style=\"padding: 5px\" onMouseOver=\"javascript:this.style.backgroundColor='#eafaff'\" onMouseOut=\"javascript:this.style.backgroundColor='transparent'\">";
       if (row[3] == "H") {
-        std::cout << "<img src=\"/images/alert.gif\">&nbsp;<span style=\"color: red\">For ancillary use only - not recommended as a primary research dataset.  It has likely been superseded by newer and better datasets.</span><br>";
+        cout << "<img src=\"/images/alert.gif\">&nbsp;<span style=\"color: red\">For ancillary use only - not recommended as a primary research dataset.  It has likely been superseded by newer and better datasets.</span><br>";
       }
       if (num_results > 1) {
-        std::cout << "<input type=\"checkbox\" name=\"cmp\" value=\"" << row[0] << "\">&nbsp;";
+        cout << "<input type=\"checkbox\" name=\"cmp\" value=\"" << row[0] << "\">&nbsp;";
       }
-      std::cout << snum << ". <a class=\"underline\" href=\"/datasets/ds" << row[0] << "/\" target=\"_blank\"><b>" << row[1] << "</b></a> <span class=\"mediumGrayText\">(ds" << row[0] << ")</span><br>" << std::endl;
-      std::cout << "<div class=\"browseSummary\">" << searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator) << "</div>" << std::endl;
-      std::cout << "</div><br>" << std::endl;
+      cout << snum << ". <a class=\"underline\" href=\"/datasets/ds" << row[0] << "/\" target=\"_blank\"><b>" << row[1] << "</b></a> <span class=\"mediumGrayText\">(ds" << row[0] << ")</span><br>" << endl;
+      cout << "<div class=\"browseSummary\">" << searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator) << "</div>" << endl;
+      cout << "</div><br>" << endl;
       ++n;
     }
   }
-  std::cout << "</form>" << std::endl;
+  cout << "</form>" << endl;
   server.disconnect();
 }
 
@@ -1045,7 +1055,7 @@ void show_start() {
   MySQL::Row row;
   my::map<CatEntry> cat_table;
   CatEntry ce;
-  std::string num_ds;
+  string num_ds;
 
   metautils::read_config("lookfordata","","");
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
@@ -1064,74 +1074,74 @@ void show_start() {
     }
   }
   server.disconnect();
-  std::cout << "Content-type: text/html" << std::endl << std::endl;
-  std::cout << "<h1>Browse the RDA</h1>" << std::endl;
-  std::cout << "<p>There are " << num_ds << " public datasets in the CISL RDA.  You can begin browsing the datasets by choosing one of the facets in the menu to the left.  Facet descriptions are given below, along with the number (in parentheses) of datasets in each.</p>" << std::endl;
-  std::cout << "<table cellspacing=\"0\" cellpadding=\"5\" border=\"0\">" << std::endl;
-  std::cout << "<tr valign=\"top\">" << std::endl;
-  std::cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Variable / Parameter";
+  cout << "Content-type: text/html" << endl << endl;
+  cout << "<h1>Browse the RDA</h1>" << endl;
+  cout << "<p>There are " << num_ds << " public datasets in the CISL RDA.  You can begin browsing the datasets by choosing one of the facets in the menu to the left.  Facet descriptions are given below, along with the number (in parentheses) of datasets in each.</p>" << endl;
+  cout << "<table cellspacing=\"0\" cellpadding=\"5\" border=\"0\">" << endl;
+  cout << "<tr valign=\"top\">" << endl;
+  cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Variable / Parameter";
   if (cat_table.found("var",ce))
-    std::cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
-  std::cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">A variable or parameter is the quantity that is measured, derived, or computed - e.g. the data value.</div></td>" << std::endl;
-  std::cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << std::endl;
-  std::cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Type of Data";
+    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">A variable or parameter is the quantity that is measured, derived, or computed - e.g. the data value.</div></td>" << endl;
+  cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << endl;
+  cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Type of Data";
   if (cat_table.found("type",ce))
-    std::cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
-  std::cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to the type of data values - e.g. grid (interpolated or computed gridpoint data), platform observation (in-situ and remotely sensed measurements), etc.</div></td>" << std::endl;
-  std::cout << "</tr>" << std::endl;
-  std::cout << "<tr valign=\"top\">" << std::endl;
-  std::cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Time Resolution";
+    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to the type of data values - e.g. grid (interpolated or computed gridpoint data), platform observation (in-situ and remotely sensed measurements), etc.</div></td>" << endl;
+  cout << "</tr>" << endl;
+  cout << "<tr valign=\"top\">" << endl;
+  cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Time Resolution";
   if (cat_table.found("tres",ce))
-    std::cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
-  std::cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to the distance in time between discrete observation measurements, model product valid times, etc.</div></td>" << std::endl;
-  std::cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << std::endl;
-  std::cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Platform";
+    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to the distance in time between discrete observation measurements, model product valid times, etc.</div></td>" << endl;
+  cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << endl;
+  cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Platform";
   if (cat_table.found("plat",ce))
-    std::cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
-  std::cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">The platform is the entity or type of entity that acquired or computed the data (e.g. aircraft, land station, reanalysis model).</div></td>" << std::endl;
-  std::cout << "</tr>" << std::endl;
-  std::cout << "<tr valign=\"top\">" << std::endl;
-  std::cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Spatial Resolution";
+    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">The platform is the entity or type of entity that acquired or computed the data (e.g. aircraft, land station, reanalysis model).</div></td>" << endl;
+  cout << "</tr>" << endl;
+  cout << "<tr valign=\"top\">" << endl;
+  cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Spatial Resolution";
   if (cat_table.found("sres",ce))
-    std::cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
-  std::cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to the horizontal distance between discrete gridpoints of a model product, reporting stations in a network, measurements of a moving platform, etc.</div></td>" << std::endl;
-  std::cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << std::endl;
-  std::cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Topic / Subtopic";
+    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to the horizontal distance between discrete gridpoints of a model product, reporting stations in a network, measurements of a moving platform, etc.</div></td>" << endl;
+  cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << endl;
+  cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Topic / Subtopic";
   if (cat_table.found("topic",ce))
-    std::cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
-  std::cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">Topic and subtopic are high-level groupings of parameters - e.g. Atmosphere (topic), Clouds (subtopic of Atmosphere).</div></td>" << std::endl;
-  std::cout << "</tr>" << std::endl;
-  std::cout << "<tr valign=\"top\">";
-  std::cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Project / Experiment";
+    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">Topic and subtopic are high-level groupings of parameters - e.g. Atmosphere (topic), Clouds (subtopic of Atmosphere).</div></td>" << endl;
+  cout << "</tr>" << endl;
+  cout << "<tr valign=\"top\">";
+  cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Project / Experiment";
   if (cat_table.found("proj",ce))
-    std::cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
-  std::cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This is the scientific project, field campaign, or experiment that acquired the data.</div></td>" << std::endl;
-  std::cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << std::endl;
-  std::cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Supports Project";
+    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This is the scientific project, field campaign, or experiment that acquired the data.</div></td>" << endl;
+  cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << endl;
+  cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Supports Project";
   if (cat_table.found("supp",ce))
-    std::cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
-  std::cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to data that were acquired to support a scientific project or experiment (e.g. GATE) or that can be used as ingest for a project (e.g. WRF).</div></td>" << std::endl;
-  std::cout << "</tr>" << std::endl;
-  std::cout << "<tr valign=\"top\">" << std::endl;
-  std::cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Data Format";
+    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to data that were acquired to support a scientific project or experiment (e.g. GATE) or that can be used as ingest for a project (e.g. WRF).</div></td>" << endl;
+  cout << "</tr>" << endl;
+  cout << "<tr valign=\"top\">" << endl;
+  cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Data Format";
   if (cat_table.found("fmt",ce))
-    std::cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
-  std::cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to the structure of the bitstream used to encapsulate the data values in a record or file - e.g ASCII, netCDF, etc.</div></td>" << std::endl;
-  std::cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << std::endl;
-  std::cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Location";
+    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to the structure of the bitstream used to encapsulate the data values in a record or file - e.g ASCII, netCDF, etc.</div></td>" << endl;
+  cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << endl;
+  cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Location";
   if (cat_table.found("loc",ce))
-    std::cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
-  std::cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This the name of the (usually geographic) location or region for which the data are valid.</div></td>" << std::endl;
-  std::cout << "</tr>" << std::endl;
-  std::cout << "</table>" << std::endl;
+    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This the name of the (usually geographic) location or region for which the data are valid.</div></td>" << endl;
+  cout << "</tr>" << endl;
+  cout << "</table>" << endl;
   server.disconnect();
 }
 
-std::string set_date_time(std::string datetime,std::string flag,std::string time_zone) {
-  std::string dt;
+string set_date_time(string datetime,string flag,string time_zone) {
+  string dt;
   size_t n;
   
-  n=std::stoi(flag);
+  n=stoi(flag);
   dt=datetime;
   switch (n) {
     case 1:
@@ -1205,7 +1215,7 @@ void fill_comparison_dataset(ComparisonEntry& de_ref) {
     TimeResolution tr;
     if (!de_ref.time_resolution_table.found(row[0],tr)) {
       tr.key=row[0];
-      tr.types.reset(new std::string);
+      tr.types.reset(new string);
       de_ref.time_resolution_table.insert(tr);
     }
     if (tr.types->length() > 0) {
@@ -1251,15 +1261,15 @@ void fill_comparison_dataset(ComparisonEntry& de_ref) {
   }
 }
 
-void write_keys(const std::list<std::string>& keys) {
+void write_keys(const std::list<string>& keys) {
   bool started;
 
   started=false;
   for (const auto& key : keys) {
     if (started) {
-      std::cout << ", ";
+      cout << ", ";
     }
-    std::cout << key;
+    cout << key;
     started=true;
   }
 }
@@ -1296,74 +1306,74 @@ void write_gridded_products(GridProducts& gp) {
   }
   if (gp.found_analyses) {
     if (num > 1) {
-      std::cout << "&bull;&nbsp;";
+      cout << "&bull;&nbsp;";
     }
-    std::cout << "Analyses<br>";
+    cout << "Analyses<br>";
   }
   if (gp.tables.forecast.size() > 0) {
     if (num > 1) {
-      std::cout << "&bull;&nbsp;";
+      cout << "&bull;&nbsp;";
     }
-    std::cout << "Forecasts <small class=\"mediumGrayText\">(";
+    cout << "Forecasts <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.forecast.keys());
-    std::cout << ")</small><br>";
+    cout << ")</small><br>";
   }
   if (gp.tables.average.size() > 0) {
     if (num > 1) {
-      std::cout << "&bull;&nbsp;";
+      cout << "&bull;&nbsp;";
     }
-    std::cout << "Averages <small class=\"mediumGrayText\">(";
+    cout << "Averages <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.average.keys());
-    std::cout << ")</small><br>";
+    cout << ")</small><br>";
   }
   if (gp.tables.accumulation.size() > 0) {
     if (num > 1) {
-      std::cout << "&bull;&nbsp;";
+      cout << "&bull;&nbsp;";
     }
-    std::cout << "Accumulations <small class=\"mediumGrayText\">(";
+    cout << "Accumulations <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.accumulation.keys());
-    std::cout << ")</small><br>";
+    cout << ")</small><br>";
   }
   if (gp.tables.weekly_mean.size() > 0) {
     if (num > 1) {
-      std::cout << "&bull;&nbsp;";
+      cout << "&bull;&nbsp;";
     }
-    std::cout << "Weekly Means <small class=\"mediumGrayText\">(";
+    cout << "Weekly Means <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.weekly_mean.keys());
-    std::cout << ")</small><br>";
+    cout << ")</small><br>";
   }
   if (gp.tables.monthly_mean.size() > 0) {
     if (num > 1) {
-      std::cout << "&bull;&nbsp;";
+      cout << "&bull;&nbsp;";
     }
-    std::cout << "Monthly Means <small class=\"mediumGrayText\">";
-    std::cout << "(";
+    cout << "Monthly Means <small class=\"mediumGrayText\">";
+    cout << "(";
     write_keys(gp.tables.monthly_mean.keys());
-    std::cout << ")</small><br>";
+    cout << ")</small><br>";
   }
   if (gp.tables.monthly_var_covar.size() > 0) {
     if (num > 1) {
-      std::cout << "&bull;&nbsp;";
+      cout << "&bull;&nbsp;";
     }
-    std::cout << "Monthly Variances/Covariances <small class=\"mediumGrayText\">(";
+    cout << "Monthly Variances/Covariances <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.monthly_var_covar.keys());
-    std::cout << ")</small><br>";
+    cout << ")</small><br>";
   }
   if (gp.tables.mean.size() > 0) {
     if (num > 1) {
-      std::cout << "&bull;&nbsp;";
+      cout << "&bull;&nbsp;";
     }
-    std::cout << "Means <small class=\"mediumGrayText\">(";
+    cout << "Means <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.mean.keys());
-    std::cout << ")</small><br>";
+    cout << ")</small><br>";
   }
   if (gp.tables.var_covar.size() > 0) {
     if (num > 1) {
-      std::cout << "&bull;&nbsp;";
+      cout << "&bull;&nbsp;";
     }
-    std::cout << "Variances/Covariances <small class=\"mediumGrayText\">(";
+    cout << "Variances/Covariances <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.var_covar.keys());
-    std::cout << ")</small><br>";
+    cout << ")</small><br>";
   }
 }
 
@@ -1371,14 +1381,14 @@ void compare() {
   XMLDocument xdoc;
   std::list<XMLElement> elist;
   ComparisonEntry ce1,ce2;
-  std::string sdum;
-  std::vector<std::string> array;
+  string sdum;
+  vector<string> array;
   TimeResolution tr;
-  std::string dsnum1,dsnum2,table1,table2;
+  string dsnum1,dsnum2,table1,table2;
   GridProducts gp1,gp2;
   GridCoverages gc1,gc2;
   size_t n;
-  std::list<std::string>::iterator it;
+  std::list<string>::iterator it;
 
   metautils::read_config("lookfordata","","");
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
@@ -1391,105 +1401,105 @@ void compare() {
   ++it;
   ce2.key=*it;
   fill_comparison_dataset(ce2);
-  std::cout << "Content-type: text/html" << std::endl << std::endl;
-  std::cout << "<style id=\"compare\">" << std::endl;
-  std::cout << "table.compare th," << std::endl;
-  std::cout << "table.compare td {" << std::endl;
-  std::cout << "  border: 1px solid #96afbf;" << std::endl;
-  std::cout << "}" << std::endl;
-  std::cout << ".left {" << std::endl;
-  std::cout << "  background-color: #b8edab;" << std::endl;
-  std::cout << "}" << std::endl;
-  std::cout << "</style>" << std::endl;
-  std::cout << "<span class=\"fs24px bold\">Comparing Datasets</span><br /><br />" << std::endl;
-  std::cout << "<table class=\"compare\" style=\"border-collapse: collapse\" width=\"100%\" cellspacing=\"0\" cellpadding=\"5\">" << std::endl;
-  std::cout << "<tr><th class=\"left\" width=\"1\" align=\"left\"><nobr>Dataset ID</nobr></th><th width=\"50%\" align=\"left\"><a href=\"/datasets/ds"+ce1.key+"/\">ds"+ce1.key+"</a></th><th width=\"50%\" align=\"left\"><a href=\"/datasets/ds"+ce2.key+"/\">ds"+ce2.key+"</a></th></tr>" << std::endl;
-  std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Title</th><td align=\"left\">"+ce1.title+"</td><td align=\"left\">"+ce2.title+"</td></tr>" << std::endl;
-  std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\"><nobr>Data Types</nobr></th><td align=\"left\">";
+  cout << "Content-type: text/html" << endl << endl;
+  cout << "<style id=\"compare\">" << endl;
+  cout << "table.compare th," << endl;
+  cout << "table.compare td {" << endl;
+  cout << "  border: 1px solid #96afbf;" << endl;
+  cout << "}" << endl;
+  cout << ".left {" << endl;
+  cout << "  background-color: #b8edab;" << endl;
+  cout << "}" << endl;
+  cout << "</style>" << endl;
+  cout << "<span class=\"fs24px bold\">Comparing Datasets</span><br /><br />" << endl;
+  cout << "<table class=\"compare\" style=\"border-collapse: collapse\" width=\"100%\" cellspacing=\"0\" cellpadding=\"5\">" << endl;
+  cout << "<tr><th class=\"left\" width=\"1\" align=\"left\"><nobr>Dataset ID</nobr></th><th width=\"50%\" align=\"left\"><a href=\"/datasets/ds"+ce1.key+"/\">ds"+ce1.key+"</a></th><th width=\"50%\" align=\"left\"><a href=\"/datasets/ds"+ce2.key+"/\">ds"+ce2.key+"</a></th></tr>" << endl;
+  cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Title</th><td align=\"left\">"+ce1.title+"</td><td align=\"left\">"+ce2.title+"</td></tr>" << endl;
+  cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\"><nobr>Data Types</nobr></th><td align=\"left\">";
   for (const auto& type : ce1.data_types) {
-    std::cout << "&bull;&nbsp;"+strutils::capitalize(type)+"<br>";
+    cout << "&bull;&nbsp;"+strutils::capitalize(type)+"<br>";
   }
-  std::cout << "</td><td align=\"left\">";
+  cout << "</td><td align=\"left\">";
   for (const auto& type : ce2.data_types) {
-    std::cout << "&bull;&nbsp;"+strutils::capitalize(type)+"<br>";
+    cout << "&bull;&nbsp;"+strutils::capitalize(type)+"<br>";
   }
-  std::cout << "</td></tr>" << std::endl;
-  std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\"><nobr>Data Formats</nobr></th><td align=\"left\">";
+  cout << "</td></tr>" << endl;
+  cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\"><nobr>Data Formats</nobr></th><td align=\"left\">";
   for (auto format : ce1.formats) {
-    if (std::regex_search(format,std::regex("^proprietary_"))) {
+    if (regex_search(format,regex("^proprietary_"))) {
       strutils::replace_all(format,"proprietary_","");
       format+=" (see dataset documentation)";
     }
     if (ce1.formats.size() > 1) {
-      std::cout << "&bull;&nbsp;";
+      cout << "&bull;&nbsp;";
     }
-    std::cout << strutils::to_capital(format)+"<br>";
+    cout << strutils::to_capital(format)+"<br>";
   }
-  std::cout << "</td><td align=\"left\">";
+  cout << "</td><td align=\"left\">";
   for (auto format : ce2.formats) {
-    if (std::regex_search(format,std::regex("^proprietary_"))) {
+    if (regex_search(format,regex("^proprietary_"))) {
       strutils::replace_all(format,"proprietary_","");
       format+=" (see dataset documentation)";
     }
     if (ce2.formats.size() > 1)
-      std::cout << "&bull;&nbsp;";
-    std::cout << strutils::to_capital(format)+"<br>";
+      cout << "&bull;&nbsp;";
+    cout << strutils::to_capital(format)+"<br>";
   }
-  std::cout << "</td></tr>" << std::endl;
-  std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Platforms</th><td align=\"left\">";
+  cout << "</td></tr>" << endl;
+  cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Platforms</th><td align=\"left\">";
   for (const auto& platform : ce1.platforms) {
     if (ce1.platforms.size() > 1)
-      std::cout << "&bull;&nbsp;";
-    std::cout << platform+"<br>";
+      cout << "&bull;&nbsp;";
+    cout << platform+"<br>";
   }
-  std::cout << "</td><td align=\"left\">";
+  cout << "</td><td align=\"left\">";
   for (const auto& platform : ce2.platforms) {
     if (ce2.platforms.size() > 1)
-      std::cout << "&bull;&nbsp;";
-    std::cout << platform+"</br>";
+      cout << "&bull;&nbsp;";
+    cout << platform+"</br>";
   }
-  std::cout << "</td></tr>" << std::endl;
-  std::cout << "<tr valign=\"bottom\"><th class=\"left\" align=\"left\">Temporal Range</th><td align=\"left\">";
-  if (!std::regex_search(ce1.start,std::regex("^9998"))) {
-    std::cout << "<nobr>" << ce1.start+"</nobr> to <nobr>"+ce1.end+"</nobr>";
+  cout << "</td></tr>" << endl;
+  cout << "<tr valign=\"bottom\"><th class=\"left\" align=\"left\">Temporal Range</th><td align=\"left\">";
+  if (!regex_search(ce1.start,regex("^9998"))) {
+    cout << "<nobr>" << ce1.start+"</nobr> to <nobr>"+ce1.end+"</nobr>";
   }
-  std::cout << "</td><td align=\"left\">";
-  if (!std::regex_search(ce2.start,std::regex("^9998"))) {
-    std::cout << "<nobr>"+ce2.start+"</nobr> to <nobr>"+ce2.end+"</nobr>";
+  cout << "</td><td align=\"left\">";
+  if (!regex_search(ce2.start,regex("^9998"))) {
+    cout << "<nobr>"+ce2.start+"</nobr> to <nobr>"+ce2.end+"</nobr>";
   }
-  std::cout << "</td></tr>" << std::endl;
+  cout << "</td></tr>" << endl;
   if (ce1.time_resolution_table.size() > 0 || ce2.time_resolution_table.size() > 0) {
-    std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Temporal Resolutions</th><td align=\"left\">";
+    cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Temporal Resolutions</th><td align=\"left\">";
     for (const auto& key : ce1.time_resolution_table.keys()) {
       sdum=key;
       strutils::replace_all(sdum,"T : ","");
       strutils::replace_all(sdum,"-","to");
       if (ce1.time_resolution_table.size() > 1) {
-        std::cout << "&bull;&nbsp;";
+        cout << "&bull;&nbsp;";
       }
       if (ce1.data_types.size() > 1) {
         ce1.time_resolution_table.found(key,tr);
-        std::cout << sdum+" <small class=\"mediumGrayText\">("+*(tr.types)+")</small><br>";
+        cout << sdum+" <small class=\"mediumGrayText\">("+*(tr.types)+")</small><br>";
       } else {
-        std::cout << sdum+"<br>";
+        cout << sdum+"<br>";
       }
     }
-    std::cout << "</td><td align=\"left\">";
+    cout << "</td><td align=\"left\">";
     for (const auto& key : ce2.time_resolution_table.keys()) {
       sdum=key;
       strutils::replace_all(sdum,"T : ","");
       strutils::replace_all(sdum,"-","to");
       if (ce2.time_resolution_table.size() > 1) {
-        std::cout << "&bull;&nbsp;";
+        cout << "&bull;&nbsp;";
       }
       if (ce2.data_types.size() > 1) {
         ce2.time_resolution_table.found(key,tr);
-        std::cout << sdum+" <small class=\"mediumGrayText\">("+*(tr.types)+")</small><br>";
+        cout << sdum+" <small class=\"mediumGrayText\">("+*(tr.types)+")</small><br>";
       } else {
-        std::cout << sdum+"<br>";
+        cout << sdum+"<br>";
       }
     }
-    std::cout << "</td></tr>" << std::endl;
+    cout << "</td></tr>" << endl;
   }
   dsnum1=strutils::substitute(ce1.key,".","");
   dsnum2=strutils::substitute(ce2.key,".","");
@@ -1510,35 +1520,35 @@ void compare() {
     pthread_join(gp2.tid,NULL);
     pthread_join(gc1.tid,NULL);
     pthread_join(gc2.tid,NULL);
-    std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Gridded Products</th><td class=\"bg0\" align=\"left\">";
+    cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Gridded Products</th><td class=\"bg0\" align=\"left\">";
     if (table_exists(server,table1)) {
       write_gridded_products(gp1);
     }
-    std::cout << "</td><td class=\"bg0\" align=\"left\">";
+    cout << "</td><td class=\"bg0\" align=\"left\">";
     if (table_exists(server,table2)) {
       write_gridded_products(gp2);
     }
-    std::cout << "</td></tr>" << std::endl;
-    std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Grid Resolution and Coverage</th><td class=\"bg0\" align=\"left\">";
+    cout << "</td></tr>" << endl;
+    cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Grid Resolution and Coverage</th><td class=\"bg0\" align=\"left\">";
     if (table_exists(server,table1)) {
       for (const auto& coverage : gc1.coverages) {
         if (gc1.coverages.size() > 1) {
-          std::cout << "&bull;&nbsp;";
+          cout << "&bull;&nbsp;";
         }
-        std::cout << gridutils::convert_grid_definition(coverage)+"<br>";
+        cout << gridutils::convert_grid_definition(coverage)+"<br>";
       }
     }
-    std::cout << "</td><td class=\"bg0\" align=\"left\">";
+    cout << "</td><td class=\"bg0\" align=\"left\">";
     if (table_exists(server,table2)) {
       for (const auto& coverage : gc2.coverages) {
         if (gc2.coverages.size() > 1) {
-          std::cout << "&bull;&nbsp;";
+          cout << "&bull;&nbsp;";
         }
-        std::cout << gridutils::convert_grid_definition(coverage)+"<br>";
+        cout << gridutils::convert_grid_definition(coverage)+"<br>";
       }
     }
-    std::cout << "</td></tr>" << std::endl;
-    std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">GCMD Parameters</th><td class=\"bg0\" align=\"left\"><div style=\"height: 150px; overflow: auto\">";
+    cout << "</td></tr>" << endl;
+    cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">GCMD Parameters</th><td class=\"bg0\" align=\"left\"><div style=\"height: 150px; overflow: auto\">";
     xdoc.open(SERVER_ROOT+"/web/datasets/ds"+ce1.key+"/metadata/dsOverview.xml");
     elist=xdoc.element_list("dsOverview/variable@vocabulary=GCMD");
     array.clear();
@@ -1550,9 +1560,9 @@ void compare() {
     }
     binary_sort(array,compare_strings);
     for (n=0; n < elist.size(); n++)
-      std::cout << "&bull;&nbsp;"+array[n]+"<br>";
+      cout << "&bull;&nbsp;"+array[n]+"<br>";
     xdoc.close();
-    std::cout << "</div></td><td class=\"bg0\" align=\"left\"><div style=\"height: 150px; overflow: auto\">";
+    cout << "</div></td><td class=\"bg0\" align=\"left\"><div style=\"height: 150px; overflow: auto\">";
     xdoc.open(SERVER_ROOT+"/web/datasets/ds"+ce2.key+"/metadata/dsOverview.xml");
     elist=xdoc.element_list("dsOverview/variable@vocabulary=GCMD");
     array.clear();
@@ -1564,27 +1574,27 @@ void compare() {
     }
     binary_sort(array,compare_strings);
     for (n=0; n < elist.size(); n++)
-      std::cout << "&bull;&nbsp;"+array[n]+"<br>";
+      cout << "&bull;&nbsp;"+array[n]+"<br>";
     xdoc.close();
-    std::cout << "</div></td></tr>" << std::endl;
+    cout << "</div></td></tr>" << endl;
   } else if (ce1.grid_resolutions.size() > 0 || ce2.grid_resolutions.size() > 0) {
-    std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Grid Resolutions</th><td class=\"bg0\" align=\"left\">";
+    cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Grid Resolutions</th><td class=\"bg0\" align=\"left\">";
     for (auto res : ce1.grid_resolutions) {
       strutils::replace_all(res,"H : ","");
       strutils::replace_all(res,"-","to");
       if (ce1.grid_resolutions.size() > 1)
-        std::cout << "&bull;&nbsp;";
-      std::cout << res+"<br>";
+        cout << "&bull;&nbsp;";
+      cout << res+"<br>";
     }
-    std::cout << "</td><td class=\"bg0\" align=\"left\">";
+    cout << "</td><td class=\"bg0\" align=\"left\">";
     for (auto res : ce2.grid_resolutions) {
       strutils::replace_all(res,"H : ","");
       strutils::replace_all(res,"-","to");
       if (ce2.grid_resolutions.size() > 1)
-        std::cout << "&bull;&nbsp;";
-      std::cout << res+"<br>";
+        cout << "&bull;&nbsp;";
+      cout << res+"<br>";
     }
-    std::cout << "</td></tr>" << std::endl;
+    cout << "</td></tr>" << endl;
   }
   table1="ObML.ds"+strutils::substitute(ce1.key,".","")+"_primaries2";
   table2="ObML.ds"+strutils::substitute(ce2.key,".","")+"_primaries2";
