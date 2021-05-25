@@ -637,10 +637,6 @@ void open_cache_for_writing() {
   }
 }
 
-void close_cache() {
-  cache.close();
-}
-
 void add_breadcrumbs(size_t num_results) {
   my::map<CountEntry> count_table;
   CountEntry ce;
@@ -783,7 +779,7 @@ void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entr
       }
     }
   }
-  close_cache();
+  cache.close();
   if (display_results) {
     std::cout << "</form>" << std::endl;
     std::cout << "</body></html>" << std::endl;
@@ -824,7 +820,7 @@ void show_datasets_from_query(MySQL::PreparedStatement& pstmt,bool display_resul
   if (display_results) {
     std::cout << "</form>" << std::endl;
   }
-  close_cache();
+  cache.close();
 }
 
 void browse(bool display_results = true) {
