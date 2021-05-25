@@ -155,76 +155,76 @@ extern "C" void *thread_summarize_grid_products(void *gpstruct) {
   query.set("select distinct t.timeRange from (select distinct timeRange_code from "+g->table+") as g left join GrML.timeRanges as t on t.code = g.timeRange_code");
   if (query.submit(tserver) == 0) {
     while (query.fetch_row(row)) {
-	sdum=row[0];
-	fidx=sdum.find("-hour Forecast");
-	aidx=sdum.find("Average");
-	cidx=sdum.find("-hour Accumulation");
-	if (sdum == "Analysis") {
-	  g->found_analyses=true;
-	}
+      sdum=row[0];
+      fidx=sdum.find("-hour Forecast");
+      aidx=sdum.find("Average");
+      cidx=sdum.find("-hour Accumulation");
+      if (sdum == "Analysis") {
+        g->found_analyses=true;
+      }
 // forecasts
-	else if (fidx != std::string::npos && fidx < 4) {
-	  se.key=sdum.substr(0,sdum.find(" "));
-	  if (!g->tables.forecast.found(se.key,se)) {
-	    g->tables.forecast.insert(se);
-	  }
-	}
+      else if (fidx != std::string::npos && fidx < 4) {
+        se.key=sdum.substr(0,sdum.find(" "));
+        if (!g->tables.forecast.found(se.key,se)) {
+          g->tables.forecast.insert(se);
+        }
+      }
 // averages
-	else if (aidx != std::string::npos) {
-	  se.key=sdum.substr(0,aidx);
-	  strutils::trim(se.key);
-	  if (!g->tables.average.found(se.key,se)) {
-	    g->tables.average.insert(se);
-	  }
-	}
+      else if (aidx != std::string::npos) {
+        se.key=sdum.substr(0,aidx);
+        strutils::trim(se.key);
+        if (!g->tables.average.found(se.key,se)) {
+          g->tables.average.insert(se);
+        }
+      }
 // accumulations
-	else if (cidx != std::string::npos && cidx < 4) {
-	  se.key=sdum.substr(0,sdum.find(" "));
-	  if (!g->tables.accumulation.found(se.key,se)) {
-	    g->tables.accumulation.insert(se);
-	  }
-	}
-	else if (std::regex_search(sdum,std::regex("^Weekly Mean"))) {
-	  se.key=sdum.substr(sdum.find("of")+3);
-	  if (!g->tables.weekly_mean.found(se.key,se)) {
-	    g->tables.weekly_mean.insert(se);
-	  }
-	}
-	else if (std::regex_search(sdum,std::regex("^Monthly Mean"))) {
-	  if ( (zidx=sdum.find("of")) != std::string::npos) {
-	    se.key=sdum.substr(zidx+3);
-	    strutils::trim(se.key);
-	    if (!g->tables.monthly_mean.found(se.key,se)) {
-		g->tables.monthly_mean.insert(se);
-	    }
-	  }
-	}
-	else if (std::regex_search(sdum,std::regex("Mean"))) {
-	  se.key="x";
-	  if ( (zidx=sdum.find("of")) != std::string::npos) {
-	    se.key=sdum.substr(zidx+3);
-	    if ( (zidx=se.key.find("at")) != std::string::npos) {
-		se.key=se.key.substr(0,zidx);
-	    }
-	  }
-	  else {
-	    if ( (zidx=sdum.find("Mean")) != std::string::npos) {
-		se.key=sdum.substr(0,zidx);
-	    }
-	  }
-	  strutils::trim(se.key);
-	  if (!g->tables.mean.found(se.key,se)) {
-	    g->tables.mean.insert(se);
-	  }
-	}
-	else if (std::regex_search(sdum,std::regex("^Variance/Covariance"))) {
-	  se.key=sdum.substr(sdum.find("of")+3);
-	  se.key=se.key.substr(se.key.find(" ")+1);
-	  se.key=se.key.substr(0,se.key.find("at")-1);
-	  if (!g->tables.var_covar.found(se.key,se)) {
-	    g->tables.var_covar.insert(se);
-	  }
-	}
+      else if (cidx != std::string::npos && cidx < 4) {
+        se.key=sdum.substr(0,sdum.find(" "));
+        if (!g->tables.accumulation.found(se.key,se)) {
+          g->tables.accumulation.insert(se);
+        }
+      }
+      else if (std::regex_search(sdum,std::regex("^Weekly Mean"))) {
+        se.key=sdum.substr(sdum.find("of")+3);
+        if (!g->tables.weekly_mean.found(se.key,se)) {
+          g->tables.weekly_mean.insert(se);
+        }
+      }
+      else if (std::regex_search(sdum,std::regex("^Monthly Mean"))) {
+        if ( (zidx=sdum.find("of")) != std::string::npos) {
+          se.key=sdum.substr(zidx+3);
+          strutils::trim(se.key);
+          if (!g->tables.monthly_mean.found(se.key,se)) {
+            g->tables.monthly_mean.insert(se);
+          }
+        }
+      }
+      else if (std::regex_search(sdum,std::regex("Mean"))) {
+        se.key="x";
+        if ( (zidx=sdum.find("of")) != std::string::npos) {
+          se.key=sdum.substr(zidx+3);
+          if ( (zidx=se.key.find("at")) != std::string::npos) {
+            se.key=se.key.substr(0,zidx);
+          }
+        }
+        else {
+          if ( (zidx=sdum.find("Mean")) != std::string::npos) {
+            se.key=sdum.substr(0,zidx);
+          }
+        }
+        strutils::trim(se.key);
+        if (!g->tables.mean.found(se.key,se)) {
+          g->tables.mean.insert(se);
+        }
+      }
+      else if (std::regex_search(sdum,std::regex("^Variance/Covariance"))) {
+        se.key=sdum.substr(sdum.find("of")+3);
+        se.key=se.key.substr(se.key.find(" ")+1);
+        se.key=se.key.substr(0,se.key.find("at")-1);
+        if (!g->tables.var_covar.found(se.key,se)) {
+          g->tables.var_covar.insert(se);
+        }
+      }
     }
   }
   tserver.disconnect();
@@ -245,7 +245,7 @@ extern "C" void *thread_summarize_grid_coverages(void *gcstruct) {
   MySQL::Query query("select distinct d.definition,d.defParams from "+g->table+" as s left join GrML.gridDefinitions as d on d.code = s.gridDefinition_code where s.dsid = '"+g->dsnum+"'");
   if (query.submit(tserver) == 0) {
     for (const auto& row : query) {
-	g->coverages.emplace_back(row[0]+"<!>"+row[1]);
+      g->coverages.emplace_back(row[0]+"<!>"+row[1]);
     }
   }
   tserver.disconnect();
@@ -326,68 +326,68 @@ void read_cache() {
   ifs.open((SERVER_ROOT+"/tmp/browse."+local_args.lkey).c_str());
   if (ifs.is_open()) {
     if (std::regex_search(local_args.url_input.refine_by,std::regex("^@"))) {
-	sp=strutils::split(local_args.url_input.refine_by,"-");
-	rmatch=sp[0];
-	if (sp.size() > 1) {
-	  nmatch=std::stoi(sp[1]);
-	}
-	else {
-	  nmatch=1;
-	}
-	local_args.url_input.refine_by=sp[0].substr(1);
+      sp=strutils::split(local_args.url_input.refine_by,"-");
+      rmatch=sp[0];
+      if (sp.size() > 1) {
+        nmatch=std::stoi(sp[1]);
+      }
+      else {
+        nmatch=1;
+      }
+      local_args.url_input.refine_by=sp[0].substr(1);
     }
     else if (local_args.url_input.browse_by.size() > 0) {
-	bmatch="@"+local_args.url_input.browse_by+"<!>"+local_args.url_input.browse_value;
+      bmatch="@"+local_args.url_input.browse_by+"<!>"+local_args.url_input.browse_value;
     }
     ifs.getline(line,256);
     while (!ifs.eof()) {
-	++num_lines;
-	if (line[0] == '@') {
-	  sp=strutils::split(line,"<!>");
-	  if (!rmatch.empty()) {
-	    if (sp[0] == rmatch) {
-		++n;
-		if (n == nmatch) {
-		  break;
-		}
-	    }
-	  }
-	  else if (!bmatch.empty()) {
-	    if (std::regex_search(line,std::regex("^"+bmatch))) {
-		break;
-	    }
-	  }
-	  bce.key=sp[0].substr(1)+"<!>"+sp[1];
-	  if (!breadcrumbs_table.found(bce.key,bce)) {
-	    bce.count.reset(new std::string);
-	    *bce.count=sp[2];
-	    breadcrumbs_table.insert(bce);
-	  }
-	  prev_results_table.clear();
-	}
-	else {
-	  if (!prev_results_table.found(line,dse)) {
-	    dse.key=line;
-	    prev_results_table.insert(dse);
-	  }
-	}
-	ifs.getline(line,256);
+      ++num_lines;
+      if (line[0] == '@') {
+        sp=strutils::split(line,"<!>");
+        if (!rmatch.empty()) {
+          if (sp[0] == rmatch) {
+            ++n;
+            if (n == nmatch) {
+              break;
+            }
+          }
+        }
+        else if (!bmatch.empty()) {
+          if (std::regex_search(line,std::regex("^"+bmatch))) {
+            break;
+          }
+        }
+        bce.key=sp[0].substr(1)+"<!>"+sp[1];
+        if (!breadcrumbs_table.found(bce.key,bce)) {
+          bce.count.reset(new std::string);
+          *bce.count=sp[2];
+          breadcrumbs_table.insert(bce);
+        }
+        prev_results_table.clear();
+      }
+      else {
+        if (!prev_results_table.found(line,dse)) {
+          dse.key=line;
+          prev_results_table.insert(dse);
+        }
+      }
+      ifs.getline(line,256);
     }
     if (!ifs.eof()) {
-	ifs.seekg(0,std::ios::beg);
-	tfile=new TempFile;
-	ofs.open(tfile->name().c_str());
-	num_lines--;
-	for (n=0; n < num_lines; n++) {
-	  ifs.getline(line,256);
-	  ofs << line << std::endl;
-	}
-	ofs.close();
+      ifs.seekg(0,std::ios::beg);
+      tfile=new TempFile;
+      ofs.open(tfile->name().c_str());
+      num_lines--;
+      for (n=0; n < num_lines; n++) {
+        ifs.getline(line,256);
+        ofs << line << std::endl;
+      }
+      ofs.close();
     }
     ifs.close();
     if (tfile != NULL) {
-	std::stringstream oss,ess;
-	unixutils::mysystem2("/bin/mv "+tfile->name()+" "+SERVER_ROOT+"/tmp/browse."+local_args.lkey,oss,ess);
+      std::stringstream oss,ess;
+      unixutils::mysystem2("/bin/mv "+tfile->name()+" "+SERVER_ROOT+"/tmp/browse."+local_args.lkey,oss,ess);
     }
   }
 }
@@ -441,7 +441,7 @@ void parse_query() {
   }
   else {
     if (!local_args.lkey.empty()) {
-	system(("rm -f "+SERVER_ROOT+"/tmp/browse."+local_args.lkey).c_str());
+      system(("rm -f "+SERVER_ROOT+"/tmp/browse."+local_args.lkey).c_str());
     }
     local_args.lkey=strutils::strand(30);
     std::cout << "Set-Cookie: lkey=" << local_args.lkey << "; domain=" << http_host << "; path=/;" << std::endl;
@@ -455,57 +455,57 @@ void parse_refine_query(MySQL::Query& query) {
   if (query.submit(server) == 0) {
     MySQL::Row row;
     while (query.fetch_row(row)) {
-	bool add_to_list;
-	if (prev_results_table.size() > 0) {
-	  DsEntry dse;
-	  if (prev_results_table.found(row[1],dse)) {
-	    add_to_list=true;
-	  }
-	  else {
-	    add_to_list=false;
-	  }
-	}
-	else {
-	  add_to_list=true;
-	}
-	if (add_to_list) {
-	  CountEntry ce;
-	  if (row[0].empty()) {
-	    ce.key="Not specified";
-	  }
-	  else if (local_args.url_input.refine_by == "loc") {
-	    ce.key=strutils::substitute(row[0],"United States Of America","USA");
-	  }
-	  else if (local_args.url_input.refine_by == "prog") {
-	    if (row[0] == "Y") {
-		ce.key="Continually Updated";
-	    }
-	    else if (row[0] == "N") {
-		ce.key="Complete";
-	    }
-	  }
-	  else {
-	    ce.key=row[0];
-	  }
-	  strutils::trim(ce.key);
-	  BreadCrumbsEntry bce;
-	  if (breadcrumbs_table.size() == 0 || !breadcrumbs_table.found(local_args.url_input.refine_by+"<!>"+ce.key,bce)) {
-	    if (local_args.url_input.refine_by == "type") {
-		ce.key=strutils::capitalize(ce.key);
-	    }
-	    if (!keyword_count_table.found(ce.key,ce)) {
-		ce.count.reset(new int);
-		*ce.count=0;
-		keyword_count_table.insert(ce);
-	    }
-	    if (prev_results_table.size() > 0) {
-		++(*ce.count);
-	    }
-	    else {
-		(*ce.count)+=std::stoi(row[1]);
-	    }
-	  }
-	}
+      bool add_to_list;
+      if (prev_results_table.size() > 0) {
+        DsEntry dse;
+        if (prev_results_table.found(row[1],dse)) {
+          add_to_list=true;
+        }
+        else {
+          add_to_list=false;
+        }
+      }
+      else {
+        add_to_list=true;
+      }
+      if (add_to_list) {
+        CountEntry ce;
+        if (row[0].empty()) {
+          ce.key="Not specified";
+        }
+        else if (local_args.url_input.refine_by == "loc") {
+          ce.key=strutils::substitute(row[0],"United States Of America","USA");
+        }
+        else if (local_args.url_input.refine_by == "prog") {
+          if (row[0] == "Y") {
+            ce.key="Continually Updated";
+          }
+          else if (row[0] == "N") {
+            ce.key="Complete";
+          }
+        }
+        else {
+          ce.key=row[0];
+        }
+        strutils::trim(ce.key);
+        BreadCrumbsEntry bce;
+        if (breadcrumbs_table.size() == 0 || !breadcrumbs_table.found(local_args.url_input.refine_by+"<!>"+ce.key,bce)) {
+          if (local_args.url_input.refine_by == "type") {
+            ce.key=strutils::capitalize(ce.key);
+          }
+          if (!keyword_count_table.found(ce.key,ce)) {
+            ce.count.reset(new int);
+            *ce.count=0;
+            keyword_count_table.insert(ce);
+          }
+          if (prev_results_table.size() > 0) {
+            ++(*ce.count);
+          }
+          else {
+            (*ce.count)+=std::stoi(row[1]);
+          }
+        }
+      }
     }
   }
   std::cout << "Content-type: text/html" << std::endl << std::endl;
@@ -515,68 +515,68 @@ void parse_refine_query(MySQL::Query& query) {
   }
   if (keyword_count_table.size() > 0) {
     if (local_args.url_input.refine_by.substr(1) != "res") {
-	keyword_count_table.keysort(
-	[](std::string& left,std::string& right) -> bool
-	{
-	  std::string l,r;
+      keyword_count_table.keysort(
+      [](std::string& left,std::string& right) -> bool
+      {
+        std::string l,r;
 
-	  if (left == "Not specified") {
-	    return true;
-	  }
-	  else if (right == "Not specified") {
-	    return true;
-	  }
-	  else {
-	    l=strutils::substitute(strutils::to_lower(left),"proprietary_","");
-	    r=strutils::substitute(strutils::to_lower(right),"proprietary_","");
-	    if (l <= r) {
-		return true;
-	    }
-	    else {
-		return false;
-	    }
-	  }
-	});
+        if (left == "Not specified") {
+          return true;
+        }
+        else if (right == "Not specified") {
+          return true;
+        }
+        else {
+          l=strutils::substitute(strutils::to_lower(left),"proprietary_","");
+          r=strutils::substitute(strutils::to_lower(right),"proprietary_","");
+          if (l <= r) {
+            return true;
+          }
+          else {
+            return false;
+          }
+        }
+      });
     }
     for (const auto& key : keyword_count_table.keys()) {
-	CountEntry ce;
-	keyword_count_table.found(key,ce);
-	std::cout << "<div style=\"background-color: " << local_args.url_input.refine_color << "; margin-bottom: 1px\"><table style=\"font-size: 13px\"><tr valign=\"top\"><td>&nbsp;&bull;</td><td>";
-	if (local_args.url_input.from_home_page == "yes") {
-	  std::cout << "<a href=\"/index.html#!lfd?b=" << local_args.url_input.refine_by << "&v=" << key << "\" onClick=\"javascript:slideUp('refine-slider')\">";
-	}
-	else {
-	  std::cout << "<a href=\"javascript:void(0)\" onClick=\"javascript:slideIn('refine-slider',function(){ document.getElementById(lastoutid).style.fontWeight='normal'; });getContent('lfd-content','/cgi-bin/lookfordata?b=" << local_args.url_input.refine_by << "&v=" << key << "')\">";
-	}
-	if (local_args.url_input.refine_by == "proj" || local_args.url_input.refine_by == "supp") {
-	  size_t idx;
-	  if ( (idx=key.find(">")) != std::string::npos) {
-	    std::cout << "<b>" << key.substr(0,idx) << "</b>" << key.substr(idx);
-	  }
-	  else {
-//	    if (key == "Not specified") {
-		std::cout << key;
+      CountEntry ce;
+      keyword_count_table.found(key,ce);
+      std::cout << "<div style=\"background-color: " << local_args.url_input.refine_color << "; margin-bottom: 1px\"><table style=\"font-size: 13px\"><tr valign=\"top\"><td>&nbsp;&bull;</td><td>";
+      if (local_args.url_input.from_home_page == "yes") {
+        std::cout << "<a href=\"/index.html#!lfd?b=" << local_args.url_input.refine_by << "&v=" << key << "\" onClick=\"javascript:slideUp('refine-slider')\">";
+      }
+      else {
+        std::cout << "<a href=\"javascript:void(0)\" onClick=\"javascript:slideIn('refine-slider',function(){ document.getElementById(lastoutid).style.fontWeight='normal'; });getContent('lfd-content','/cgi-bin/lookfordata?b=" << local_args.url_input.refine_by << "&v=" << key << "')\">";
+      }
+      if (local_args.url_input.refine_by == "proj" || local_args.url_input.refine_by == "supp") {
+        size_t idx;
+        if ( (idx=key.find(">")) != std::string::npos) {
+          std::cout << "<b>" << key.substr(0,idx) << "</b>" << key.substr(idx);
+        }
+        else {
+//          if (key == "Not specified") {
+            std::cout << key;
 /*
-	    }
-	    else {
-		std::cout << "<b>" << key << "</b>";
-	    }
+          }
+          else {
+            std::cout << "<b>" << key << "</b>";
+          }
 */
-	  }
-	}
-	else if (local_args.url_input.refine_by == "fmt") {
-	  auto fmt=strutils::substitute(key,"proprietary_","");
-	  std::cout << strutils::to_capital(fmt);
-	}
-	else {
-	  if (key == strutils::to_upper(key)) {
-	    std::cout << strutils::capitalize(key);
-	  }
-	  else {
-	    std::cout << key;
-	  }
-	}
-	std::cout << "</a> <small class=\"mediumGrayText\">(" << *(ce.count) << ")</small>" << "</td></tr></table></div>" << std::endl;
+        }
+      }
+      else if (local_args.url_input.refine_by == "fmt") {
+        auto fmt=strutils::substitute(key,"proprietary_","");
+        std::cout << strutils::to_capital(fmt);
+      }
+      else {
+        if (key == strutils::to_upper(key)) {
+          std::cout << strutils::capitalize(key);
+        }
+        else {
+          std::cout << key;
+        }
+      }
+      std::cout << "</a> <small class=\"mediumGrayText\">(" << *(ce.count) << ")</small>" << "</td></tr></table></div>" << std::endl;
     }
     std::cout << "<div style=\"background-color: " << local_args.url_input.refine_color << "; line-height: 1px\">&nbsp;</div>";
     std::cout << std::endl;
@@ -592,98 +592,98 @@ void show_refine_results() {
   MySQL::Query query;
   if (local_args.url_input.refine_by == "var") {
     if (prev_results_table.size() > 0) {
-	query.set("select distinct substring_index(g.path,' > ',-1),v.dsid from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword where v.vocabulary = 'GCMD'");
+      query.set("select distinct substring_index(g.path,' > ',-1),v.dsid from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword where v.vocabulary = 'GCMD'");
     }
     else {
-	query.set("select s.keyword,count(distinct s.dsid) from (select distinct substring_index(g.path,' > ',-1) as keyword,v.dsid from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword left join search.datasets as d on d.dsid = v.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and v.vocabulary = 'GCMD') as s group by s.keyword");
+      query.set("select s.keyword,count(distinct s.dsid) from (select distinct substring_index(g.path,' > ',-1) as keyword,v.dsid from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword left join search.datasets as d on d.dsid = v.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and v.vocabulary = 'GCMD') as s group by s.keyword");
     }
   }
   else if (local_args.url_input.refine_by == "tres") {
     if (prev_results_table.size() > 0) {
-	query.set("select distinct replace(substring(t.keyword,5),' - ',' to '),d.dsid,s.idx from search.datasets as d left join search.time_resolutions as t on t.dsid = d.dsid left join search.time_resolution_sort as s on s.keyword = t.keyword where "+INDEXABLE_DATASET_CONDITIONS+" order by s.idx");
+      query.set("select distinct replace(substring(t.keyword,5),' - ',' to '),d.dsid,s.idx from search.datasets as d left join search.time_resolutions as t on t.dsid = d.dsid left join search.time_resolution_sort as s on s.keyword = t.keyword where "+INDEXABLE_DATASET_CONDITIONS+" order by s.idx");
     }
     else {
-	query.set("select replace(substring(t.keyword,5),' - ',' to '),count(distinct d.dsid),any_value(s.idx) as idx from search.datasets as d left join search.time_resolutions as t on t.dsid = d.dsid left join search.time_resolution_sort as s on s.keyword = t.keyword where "+INDEXABLE_DATASET_CONDITIONS+" and !isnull(idx) group by t.keyword order by idx");
+      query.set("select replace(substring(t.keyword,5),' - ',' to '),count(distinct d.dsid),any_value(s.idx) as idx from search.datasets as d left join search.time_resolutions as t on t.dsid = d.dsid left join search.time_resolution_sort as s on s.keyword = t.keyword where "+INDEXABLE_DATASET_CONDITIONS+" and !isnull(idx) group by t.keyword order by idx");
     }
   }
   else if (local_args.url_input.refine_by == "plat") {
     if (prev_results_table.size() > 0) {
-	query.set("select distinct g.last_in_path,d.dsid from search.datasets as d left join search.platforms_new as p on p.dsid = d.dsid left join search.GCMD_platforms as g on g.uuid = p.keyword where "+INDEXABLE_DATASET_CONDITIONS);
+      query.set("select distinct g.last_in_path,d.dsid from search.datasets as d left join search.platforms_new as p on p.dsid = d.dsid left join search.GCMD_platforms as g on g.uuid = p.keyword where "+INDEXABLE_DATASET_CONDITIONS);
     }
     else {
-	query.set("select distinct g.last_in_path,count(distinct d.dsid) from search.datasets as d left join search.platforms_new as p on p.dsid = d.dsid left join search.GCMD_platforms as g on g.uuid = p.keyword where "+INDEXABLE_DATASET_CONDITIONS+" group by g.last_in_path");
+      query.set("select distinct g.last_in_path,count(distinct d.dsid) from search.datasets as d left join search.platforms_new as p on p.dsid = d.dsid left join search.GCMD_platforms as g on g.uuid = p.keyword where "+INDEXABLE_DATASET_CONDITIONS+" group by g.last_in_path");
     }
   }
   else if (local_args.url_input.refine_by == "sres") {
     if (prev_results_table.size() > 0) {
-	query.set("select distinct replace(substring(r.keyword,5),' - ',' to '),d.dsid,s.idx from search.datasets as d left join search.grid_resolutions as r on r.dsid = d.dsid left join search.grid_resolution_sort as s on s.keyword = r.keyword where "+INDEXABLE_DATASET_CONDITIONS+" order by s.idx");
+      query.set("select distinct replace(substring(r.keyword,5),' - ',' to '),d.dsid,s.idx from search.datasets as d left join search.grid_resolutions as r on r.dsid = d.dsid left join search.grid_resolution_sort as s on s.keyword = r.keyword where "+INDEXABLE_DATASET_CONDITIONS+" order by s.idx");
     }
     else {
-	query.set("select replace(substring(r.keyword,5),' - ',' to '),count(distinct d.dsid),any_value(s.idx) as idx from search.datasets as d left join search.grid_resolutions as r on r.dsid = d.dsid left join search.grid_resolution_sort as s on s.keyword = r.keyword where "+INDEXABLE_DATASET_CONDITIONS+" and !isnull(idx) group by r.keyword order by idx");
+      query.set("select replace(substring(r.keyword,5),' - ',' to '),count(distinct d.dsid),any_value(s.idx) as idx from search.datasets as d left join search.grid_resolutions as r on r.dsid = d.dsid left join search.grid_resolution_sort as s on s.keyword = r.keyword where "+INDEXABLE_DATASET_CONDITIONS+" and !isnull(idx) group by r.keyword order by idx");
     }
   }
   else if (local_args.url_input.refine_by == "topic") {
     if (prev_results_table.size() > 0) {
-	query.set("select distinct substring_index(substring_index(g.path,' > ',-3),' > ',2),v.dsid from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword where v.vocabulary = 'GCMD'");
+      query.set("select distinct substring_index(substring_index(g.path,' > ',-3),' > ',2),v.dsid from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword where v.vocabulary = 'GCMD'");
     }
     else {
-	query.set("select s.keyword,count(distinct s.dsid) from (select distinct substring_index(substring_index(g.path,' > ',-3),' > ',2) as keyword,v.dsid from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword left join search.datasets as d on d.dsid = v.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and v.vocabulary = 'GCMD') as s group by s.keyword");
+      query.set("select s.keyword,count(distinct s.dsid) from (select distinct substring_index(substring_index(g.path,' > ',-3),' > ',2) as keyword,v.dsid from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword left join search.datasets as d on d.dsid = v.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and v.vocabulary = 'GCMD') as s group by s.keyword");
     }
   }
   else if (local_args.url_input.refine_by == "proj") {
     if (prev_results_table.size() > 0) {
-	query.set("select distinct g.last_in_path,d.dsid from search.datasets as d left join search.projects_new as p on p.dsid = d.dsid left join search.GCMD_projects as g on g.uuid = p.keyword where "+INDEXABLE_DATASET_CONDITIONS);
+      query.set("select distinct g.last_in_path,d.dsid from search.datasets as d left join search.projects_new as p on p.dsid = d.dsid left join search.GCMD_projects as g on g.uuid = p.keyword where "+INDEXABLE_DATASET_CONDITIONS);
     }
     else {
-	query.set("select distinct g.last_in_path,count(distinct d.dsid) from search.datasets as d left join search.projects_new as p on p.dsid = d.dsid left join search.GCMD_projects as g on g.uuid = p.keyword where "+INDEXABLE_DATASET_CONDITIONS+" group by g.last_in_path");
+      query.set("select distinct g.last_in_path,count(distinct d.dsid) from search.datasets as d left join search.projects_new as p on p.dsid = d.dsid left join search.GCMD_projects as g on g.uuid = p.keyword where "+INDEXABLE_DATASET_CONDITIONS+" group by g.last_in_path");
     }
   }
   else if (local_args.url_input.refine_by == "type") {
     if (prev_results_table.size() > 0) {
-	query.set("select distinct t.keyword,d.dsid from search.datasets as d left join search.data_types as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS);
+      query.set("select distinct t.keyword,d.dsid from search.datasets as d left join search.data_types as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS);
     }
     else {
-	query.set("select distinct t.keyword,count(distinct d.dsid) from search.datasets as d left join search.data_types as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" group by t.keyword");
+      query.set("select distinct t.keyword,count(distinct d.dsid) from search.datasets as d left join search.data_types as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" group by t.keyword");
     }
   }
   else if (local_args.url_input.refine_by == "supp") {
     if (prev_results_table.size() > 0) {
-	query.set("select distinct g.last_in_path,d.dsid from search.datasets as d left join search.supportedProjects_new as p on p.dsid = d.dsid left join search.GCMD_projects as g on g.uuid = p.keyword where "+INDEXABLE_DATASET_CONDITIONS);
+      query.set("select distinct g.last_in_path,d.dsid from search.datasets as d left join search.supportedProjects_new as p on p.dsid = d.dsid left join search.GCMD_projects as g on g.uuid = p.keyword where "+INDEXABLE_DATASET_CONDITIONS);
     }
     else {
-	query.set("select g.last_in_path,count(distinct d.dsid) from search.datasets as d left join search.supportedProjects_new as p on p.dsid = d.dsid left join search.GCMD_projects as g on g.uuid = p.keyword where "+INDEXABLE_DATASET_CONDITIONS+" group by g.last_in_path");
+      query.set("select g.last_in_path,count(distinct d.dsid) from search.datasets as d left join search.supportedProjects_new as p on p.dsid = d.dsid left join search.GCMD_projects as g on g.uuid = p.keyword where "+INDEXABLE_DATASET_CONDITIONS+" group by g.last_in_path");
     }
   }
   else if (local_args.url_input.refine_by == "fmt") {
     if (prev_results_table.size() > 0) {
-	query.set("select distinct f.keyword,d.dsid from search.datasets as d left join search.formats as f on f.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS);
+      query.set("select distinct f.keyword,d.dsid from search.datasets as d left join search.formats as f on f.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS);
     }
     else {
-	query.set("select distinct f.keyword,count(distinct d.dsid) from search.datasets as d left join search.formats as f on f.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" group by f.keyword");
+      query.set("select distinct f.keyword,count(distinct d.dsid) from search.datasets as d left join search.formats as f on f.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" group by f.keyword");
     }
   }
   else if (local_args.url_input.refine_by == "instr") {
     if (prev_results_table.size() > 0) {
-	query.set("select distinct g.last_in_path,d.dsid from search.datasets as d left join search.instruments_new as i on i.dsid = d.dsid left join search.GCMD_instruments as g on g.uuid = i.keyword where "+INDEXABLE_DATASET_CONDITIONS);
+      query.set("select distinct g.last_in_path,d.dsid from search.datasets as d left join search.instruments_new as i on i.dsid = d.dsid left join search.GCMD_instruments as g on g.uuid = i.keyword where "+INDEXABLE_DATASET_CONDITIONS);
     }
     else {
-	query.set("select distinct g.last_in_path,count(distinct d.dsid) from search.datasets as d left join search.instruments_new as i on i.dsid = d.dsid left join search.GCMD_instruments as g on g.uuid = i.keyword where "+INDEXABLE_DATASET_CONDITIONS+" group by g.last_in_path");
+      query.set("select distinct g.last_in_path,count(distinct d.dsid) from search.datasets as d left join search.instruments_new as i on i.dsid = d.dsid left join search.GCMD_instruments as g on g.uuid = i.keyword where "+INDEXABLE_DATASET_CONDITIONS+" group by g.last_in_path");
     }
   }
   else if (local_args.url_input.refine_by == "loc") {
     if (prev_results_table.size() > 0) {
-	query.set("select distinct if(instr(l.keyword,'United States') > 0,substring_index(l.keyword,' > ',-2),substring_index(l.keyword,' > ',-1)),d.dsid from search.datasets as d left join search.locations as l on l.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (isnull(l.include) or l.include != 'N')");
+      query.set("select distinct if(instr(l.keyword,'United States') > 0,substring_index(l.keyword,' > ',-2),substring_index(l.keyword,' > ',-1)),d.dsid from search.datasets as d left join search.locations as l on l.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (isnull(l.include) or l.include != 'N')");
     }
     else {
-	query.set("select distinct if(instr(l.keyword,'United States') > 0,substring_index(l.keyword,' > ',-2),substring_index(l.keyword,' > ',-1)),count(distinct d.dsid) from search.datasets as d left join search.locations as l on l.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (isnull(l.include) or l.include != 'N') group by l.keyword");
+      query.set("select distinct if(instr(l.keyword,'United States') > 0,substring_index(l.keyword,' > ',-2),substring_index(l.keyword,' > ',-1)),count(distinct d.dsid) from search.datasets as d left join search.locations as l on l.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (isnull(l.include) or l.include != 'N') group by l.keyword");
     }
   }
   else if (local_args.url_input.refine_by == "prog") {
     if (prev_results_table.size() > 0) {
-	query.set("select continuing_update,dsid from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS);
+      query.set("select continuing_update,dsid from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS);
     }
     else {
-	query.set("select continuing_update,count(distinct dsid) from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS+" group by continuing_update");
+      query.set("select continuing_update,count(distinct dsid) from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS+" group by continuing_update");
     }
   }
   else if (local_args.url_input.refine_by == "ftext") {
@@ -721,31 +721,31 @@ void add_breadcrumbs(size_t num_results) {
   auto n=0;
   for (const auto& key : breadcrumbs_table.keys()) {
     if (n > 0) {
-	std::cout << " <b>&gt;</b> ";
+      std::cout << " <b>&gt;</b> ";
     }
     BreadCrumbsEntry bce;
     breadcrumbs_table.found(key,bce);
     auto kparts=strutils::split(key,"<!>");
     auto bval=kparts[1];
     if (kparts[0] == "var" || kparts[0] == "type") {
-	bval=strutils::capitalize(bval);
+      bval=strutils::capitalize(bval);
     }
     else if (kparts[0] == "ftext") {
-	bval="'"+bval+"'";
+      bval="'"+bval+"'";
     }
     std::cout << "<a style=\"font-weight: bold; padding-left: 5px\" href=\"javascript:void(0)\" onClick=\"javascript:document.getElementById('breadcrumbs').innerHTML='"+breadcrumbs+"';slideOutFrom('" << kparts[0];
     if (n > 0) {
-	breadcrumbs+=" <b>&gt;</b> ";
+      breadcrumbs+=" <b>&gt;</b> ";
     }
     breadcrumbs+="<a style=&quot;font-weight: bold; padding-left: 5px&quot; href=&quot;javascript:void(0)&quot; onClick=&quot;javascript:slideOutFrom(\\'"+kparts[0];
     if (!count_table.found(kparts[0],ce)) {
-	ce.key=kparts[0];
-	ce.count.reset(new int);
-	*ce.count=1;
-	count_table.insert(ce);
+      ce.key=kparts[0];
+      ce.count.reset(new int);
+      *ce.count=1;
+      count_table.insert(ce);
     }
     else {
-	++(*ce.count);
+      ++(*ce.count);
     }
     std::cout << "-" << *ce.count << "','')\"><nobr>" << category(kparts[0]) << "</nobr></a> : " << bval << " <span class=\"mediumGrayText\">(" << *bce.count << ")</span>";
     breadcrumbs+="-"+strutils::itos(*ce.count)+"\\',\\'\\')&quot;><nobr>"+category(kparts[0])+"</nobr></a> : "+bval+" <span class=&quot;mediumGrayText&quot;>("+*bce.count+")</span>";
@@ -813,21 +813,21 @@ void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entr
 
   while (pstmt.fetch_row(row)) {
     if (prev_results_table.found(row[0],dse)) {
-	if (num_entries < 2) {
-	  ++num_results;
-	}
-	else {
-	  if (!multi_table.found(row[0],ce)) {
-	    ce.key=row[0];
-	    ce.count.reset(new int);
-	    (*ce.count)=0;
-	    multi_table.insert(ce);
-	  }
-	  ++(*ce.count);
-	  if ((*ce.count) == num_entries) {
-	    ++num_results;
-	  }
-	}
+      if (num_entries < 2) {
+        ++num_results;
+      }
+      else {
+        if (!multi_table.found(row[0],ce)) {
+          ce.key=row[0];
+          ce.count.reset(new int);
+          (*ce.count)=0;
+          multi_table.insert(ce);
+        }
+        ++(*ce.count);
+        if ((*ce.count) == num_entries) {
+          ++num_results;
+        }
+      }
     }
   }
   open_cache_for_writing();
@@ -842,24 +842,24 @@ void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entr
   while (pstmt.fetch_row(row)) {
     ce.key="";
     if (prev_results_table.found(row[0],dse) && (num_entries < 2 || (multi_table.found(row[0],ce) && (*ce.count) == static_cast<int>(num_entries)))) {
-	if (!ce.key.empty()) {
-	  (*ce.count)=0;
-	}
-	cache << row[0] << std::endl;
-	sdum=strutils::itos(n+1);
-	if (display_results) {
-	  std::cout << "<div style=\"padding: 5px\" onMouseOver=\"javascript:this.style.backgroundColor='#eafaff'\" onMouseOut=\"javascript:this.style.backgroundColor='transparent'\">";
-	  if (row[3] == "H") {
-	    std::cout << "<img src=\"/images/alert.gif\">&nbsp;<span style=\"color: red\">For ancillary use only - not recommended as a primary research dataset.  It has likely been superseded by newer and better datasets.</span><br>";
-	  }
-	  if (num_results > 1) {
-	    std::cout << "<input type=\"checkbox\" name=\"cmp\" value=\"" << row[0] << "\">&nbsp;";
-	  }
-	  std::cout << sdum << ". <a class=\"underline\" href=\"/datasets/ds" << row[0] << "/\" target=\"_blank\"><b>" << row[1] << "</b></a> <span class=\"mediumGrayText\">(ds" << row[0] << ")</span><br>" << std::endl;
-	  std::cout << "<div class=\"browseSummary\">" << searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator) << "</div>" << std::endl;
-	  std::cout << "</div><br>" << std::endl;
-	  ++n;
-	}
+      if (!ce.key.empty()) {
+        (*ce.count)=0;
+      }
+      cache << row[0] << std::endl;
+      sdum=strutils::itos(n+1);
+      if (display_results) {
+        std::cout << "<div style=\"padding: 5px\" onMouseOver=\"javascript:this.style.backgroundColor='#eafaff'\" onMouseOut=\"javascript:this.style.backgroundColor='transparent'\">";
+        if (row[3] == "H") {
+          std::cout << "<img src=\"/images/alert.gif\">&nbsp;<span style=\"color: red\">For ancillary use only - not recommended as a primary research dataset.  It has likely been superseded by newer and better datasets.</span><br>";
+        }
+        if (num_results > 1) {
+          std::cout << "<input type=\"checkbox\" name=\"cmp\" value=\"" << row[0] << "\">&nbsp;";
+        }
+        std::cout << sdum << ". <a class=\"underline\" href=\"/datasets/ds" << row[0] << "/\" target=\"_blank\"><b>" << row[1] << "</b></a> <span class=\"mediumGrayText\">(ds" << row[0] << ")</span><br>" << std::endl;
+        std::cout << "<div class=\"browseSummary\">" << searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator) << "</div>" << std::endl;
+        std::cout << "</div><br>" << std::endl;
+        ++n;
+      }
     }
   }
   close_cache();
@@ -886,18 +886,18 @@ void show_datasets_from_query(MySQL::PreparedStatement& pstmt,bool display_resul
   while (pstmt.fetch_row(row)) {
     cache << row[0] << std::endl;
     if (display_results) {
-	sdum=strutils::itos(n+1);
-	std::cout << "<div style=\"padding: 5px\" onMouseOver=\"javascript:this.style.backgroundColor='#eafaff'\" onMouseOut=\"javascript:this.style.backgroundColor='transparent'\" itemscope itemtype=\"http://schema.org/Dataset\">";
-	if (row[3] == "H") {
-	  std::cout << "<img src=\"/images/alert.gif\">&nbsp;<span style=\"color: red\">For ancillary use only - not recommended as a primary research dataset.  It has likely been superseded by newer and better datasets.</span><br>";
-	}
-	if (pstmt.num_rows() > 1) {
-	  std::cout << "<input type=\"checkbox\" name=\"cmp\" value=\""+row[0]+"\">&nbsp;";
-	}
-	std::cout << sdum+". <a class=\"underline\" href=\"/datasets/ds"+row[0]+"/\" target=\"_blank\" itemprop=\"url\"><b itemprop=\"name\">"+row[1]+"</b></a> <span class=\"mediumGrayText\">(ds"+row[0]+")</span><br>" << std::endl;
-	std::cout << "<div class=\"browseSummary\" itemprop=\"description\">"+searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator)+"</div>" << std::endl;
-	std::cout << "</div><br>" << std::endl;
-	++n;
+      sdum=strutils::itos(n+1);
+      std::cout << "<div style=\"padding: 5px\" onMouseOver=\"javascript:this.style.backgroundColor='#eafaff'\" onMouseOut=\"javascript:this.style.backgroundColor='transparent'\" itemscope itemtype=\"http://schema.org/Dataset\">";
+      if (row[3] == "H") {
+        std::cout << "<img src=\"/images/alert.gif\">&nbsp;<span style=\"color: red\">For ancillary use only - not recommended as a primary research dataset.  It has likely been superseded by newer and better datasets.</span><br>";
+      }
+      if (pstmt.num_rows() > 1) {
+        std::cout << "<input type=\"checkbox\" name=\"cmp\" value=\""+row[0]+"\">&nbsp;";
+      }
+      std::cout << sdum+". <a class=\"underline\" href=\"/datasets/ds"+row[0]+"/\" target=\"_blank\" itemprop=\"url\"><b itemprop=\"name\">"+row[1]+"</b></a> <span class=\"mediumGrayText\">(ds"+row[0]+")</span><br>" << std::endl;
+      std::cout << "<div class=\"browseSummary\" itemprop=\"description\">"+searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator)+"</div>" << std::endl;
+      std::cout << "</div><br>" << std::endl;
+      ++n;
     }
   }
   if (display_results) {
@@ -918,106 +918,106 @@ void browse(bool display_results = true) {
   }
   else if (local_args.url_input.browse_by == "tres") {
     if (local_args.url_input.browse_value == "Not specified") {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.time_resolutions as r on r.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(r.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.time_resolutions as r on r.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(r.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
     else {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.time_resolutions as r left join search.datasets as d on d.dsid = r.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and r.keyword = concat('T : ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{strutils::substitute(local_args.url_input.browse_value," to "," - ")},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.time_resolutions as r left join search.datasets as d on d.dsid = r.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and r.keyword = concat('T : ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{strutils::substitute(local_args.url_input.browse_value," to "," - ")},pstmt,pstmt_error);
     }
   }
   else if (local_args.url_input.browse_by == "plat") {
     if (local_args.url_input.browse_value == "Not specified") {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.platforms_new as p on p.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(p.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.platforms_new as p on p.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(p.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
     else {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.platforms_new as p left join search.GCMD_platforms as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?)) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING,MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value,local_args.url_input.browse_value},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.platforms_new as p left join search.GCMD_platforms as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?)) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING,MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value,local_args.url_input.browse_value},pstmt,pstmt_error);
     }
   }
   else if (local_args.url_input.browse_by == "sres") {
     if (local_args.url_input.browse_value == "Not specified") {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.grid_resolutions as g on g.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(g.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.grid_resolutions as g on g.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(g.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
     else {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.grid_resolutions as g left join search.datasets as d on d.dsid = g.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.keyword = concat('H : ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{strutils::substitute(local_args.url_input.browse_value," to "," - ")},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.grid_resolutions as g left join search.datasets as d on d.dsid = g.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.keyword = concat('H : ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{strutils::substitute(local_args.url_input.browse_value," to "," - ")},pstmt,pstmt_error);
     }
   }
   else if (local_args.url_input.browse_by == "topic") {
     auto parts=strutils::split(local_args.url_input.browse_value," > ");
     auto topic_condition="v.topic = '"+parts[0]+"'";
     if (parts.size() > 1) {
-	topic_condition+=" and v.term = '"+parts[1]+"'";
+      topic_condition+=" and v.term = '"+parts[1]+"'";
     }
     pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.GCMD_variables as v left join search.datasets as d on d.dsid = v.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and "+topic_condition+" group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
   }
   else if (local_args.url_input.browse_by == "proj") {
     if (local_args.url_input.browse_value == "Not specified") {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.projects_new as p on p.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(p.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.projects_new as p on p.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(p.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
     else {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.projects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?)) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING,MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value,local_args.url_input.browse_value},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.projects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?)) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING,MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value,local_args.url_input.browse_value},pstmt,pstmt_error);
     }
   }
   else if (local_args.url_input.browse_by == "type") {
     if (local_args.url_input.browse_value == "Not specified") {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.data_types as y on y.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(y.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.data_types as y on y.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(y.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
     else {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.data_types as y on y.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and y.keyword = ? group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.data_types as y on y.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and y.keyword = ? group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value},pstmt,pstmt_error);
     }
   }
   else if (local_args.url_input.browse_by == "supp") {
     if (local_args.url_input.browse_value == "Not specified") {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.supportedProjects_new as s on s.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(s.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.supportedProjects_new as s on s.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(s.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
     else {
-	std::vector<enum_field_types> parameter_types;
-	std::vector<std::string> parameters;
-	std::string qspec="select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = '"+local_args.url_input.browse_value+"' or g.path like '% > "+local_args.url_input.browse_value+"')";
-	std::string pstmt_spec="select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?))";
-	parameter_types.emplace_back(MYSQL_TYPE_STRING);
-	parameters.emplace_back(local_args.url_input.browse_value);
-	parameter_types.emplace_back(MYSQL_TYPE_STRING);
-	parameters.emplace_back(local_args.url_input.browse_value);
-	if (!local_args.url_input.origin.empty()) {
-	  pstmt_spec+=" and p.origin = ?";
-	  parameter_types.emplace_back(MYSQL_TYPE_STRING);
-	  parameters.emplace_back(local_args.url_input.origin);
-	}
-	pstmt_spec+=" group by d.dsid order by d.type,trank";
-	pstmt_good=run_prepared_statement(server,pstmt_spec,parameter_types,parameters,pstmt,pstmt_error);
+      std::vector<enum_field_types> parameter_types;
+      std::vector<std::string> parameters;
+      std::string qspec="select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = '"+local_args.url_input.browse_value+"' or g.path like '% > "+local_args.url_input.browse_value+"')";
+      std::string pstmt_spec="select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.supportedProjects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword left join search.datasets as d on d.dsid = p.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and (g.last_in_path = ? or g.path like concat('% > ',?))";
+      parameter_types.emplace_back(MYSQL_TYPE_STRING);
+      parameters.emplace_back(local_args.url_input.browse_value);
+      parameter_types.emplace_back(MYSQL_TYPE_STRING);
+      parameters.emplace_back(local_args.url_input.browse_value);
+      if (!local_args.url_input.origin.empty()) {
+        pstmt_spec+=" and p.origin = ?";
+        parameter_types.emplace_back(MYSQL_TYPE_STRING);
+        parameters.emplace_back(local_args.url_input.origin);
+      }
+      pstmt_spec+=" group by d.dsid order by d.type,trank";
+      pstmt_good=run_prepared_statement(server,pstmt_spec,parameter_types,parameters,pstmt,pstmt_error);
     }
   }
   else if (local_args.url_input.browse_by == "fmt") {
     if (local_args.url_input.browse_value == "Not specified") {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.formats as f on f.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(f.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.formats as f on f.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(f.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
     else {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.formats as f left join search.datasets as d on d.dsid = f.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and f.keyword = ? group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.formats as f left join search.datasets as d on d.dsid = f.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and f.keyword = ? group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value},pstmt,pstmt_error);
     }
   }
   else if (local_args.url_input.browse_by == "instr") {
     if (local_args.url_input.browse_value == "Not specified") {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.instruments_new as i on i.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(i.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.instruments_new as i on i.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(i.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
     else {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.instruments_new as i left join search.GCMD_instruments as g on g.uuid = i.keyword left join search.datasets as d on d.dsid = i.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.last_in_path = ? group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.instruments_new as i left join search.GCMD_instruments as g on g.uuid = i.keyword left join search.datasets as d on d.dsid = i.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and g.last_in_path = ? group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{local_args.url_input.browse_value},pstmt,pstmt_error);
     }
   }
   else if (local_args.url_input.browse_by == "loc") {
     if (local_args.url_input.browse_value == "Not specified") {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.locations as l on l.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(l.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.locations as l on l.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(l.keyword) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
     else {
-	auto keyword=strutils::substitute(local_args.url_input.browse_value,"USA","United States Of America");
-	strutils::replace_all(keyword,"'","\\'");
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.locations as l left join search.datasets as d on d.dsid = l.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and l.keyword like concat('% > ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{keyword},pstmt,pstmt_error);
+      auto keyword=strutils::substitute(local_args.url_input.browse_value,"USA","United States Of America");
+      strutils::replace_all(keyword,"'","\\'");
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.locations as l left join search.datasets as d on d.dsid = l.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and l.keyword like concat('% > ',?) group by d.dsid order by d.type,trank",std::vector<enum_field_types>{MYSQL_TYPE_STRING},std::vector<std::string>{keyword},pstmt,pstmt_error);
     }
   }
   else if (local_args.url_input.browse_by == "prog") {
     if (local_args.url_input.browse_value == "Complete") {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and d.continuing_update = 'N' group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and d.continuing_update = 'N' group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
     else if (local_args.url_input.browse_value == "Continually Updated") {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and d.continuing_update = 'Y' group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and d.continuing_update = 'Y' group by d.dsid order by d.type,trank",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
   }
   else if (local_args.url_input.browse_by == "ftext") {
@@ -1026,73 +1026,73 @@ void browse(bool display_results = true) {
     std::vector<enum_field_types> parameter_types;
     std::vector<std::string> parameters;
     for (size_t n=0; n < parts.size(); ++n) {
-	if (parts[n].front() == '-') {
-	  if (!exclude_words.empty()) {
-	    exclude_words+=" or ";
-	  }
-	  exclude_words+="word = ?";
-	  parameter_types.emplace_back(MYSQL_TYPE_STRING);
-	  parameters.emplace_back(parts[n].substr(1));
-	}
-	else {
-	  auto word=parts[n];
-	  bool ignore;
-	  auto sword=searchutils::cleaned_search_word(word,ignore);
-	  if (!include_words.empty()) {
-	    include_words+=" or ";
-	  }
-	  include_words+="word = ? or (word like ? and sword = ?)";
-	  for (size_t m=0; m < 2; ++m) {
-	    parameter_types.emplace_back(MYSQL_TYPE_STRING);
-	    parameters.emplace_back(word);
-	    parameter_types.emplace_back(MYSQL_TYPE_STRING);
-	    parameters.emplace_back(sword);
-	    parameter_types.emplace_back(MYSQL_TYPE_STRING);
-	    parameters.emplace_back(strutils::soundex(sword));
-	  }
-	  num_entries++;
-	}
+      if (parts[n].front() == '-') {
+        if (!exclude_words.empty()) {
+          exclude_words+=" or ";
+        }
+        exclude_words+="word = ?";
+        parameter_types.emplace_back(MYSQL_TYPE_STRING);
+        parameters.emplace_back(parts[n].substr(1));
+      }
+      else {
+        auto word=parts[n];
+        bool ignore;
+        auto sword=searchutils::cleaned_search_word(word,ignore);
+        if (!include_words.empty()) {
+          include_words+=" or ";
+        }
+        include_words+="word = ? or (word like ? and sword = ?)";
+        for (size_t m=0; m < 2; ++m) {
+          parameter_types.emplace_back(MYSQL_TYPE_STRING);
+          parameters.emplace_back(word);
+          parameter_types.emplace_back(MYSQL_TYPE_STRING);
+          parameters.emplace_back(sword);
+          parameter_types.emplace_back(MYSQL_TYPE_STRING);
+          parameters.emplace_back(strutils::soundex(sword));
+        }
+        num_entries++;
+      }
     }
     if (!include_words.empty() && !exclude_words.empty()) {
     }
     else if (!include_words.empty()) {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank,word from (select dsid,word from search.title_wordlist where "+include_words+" union select dsid,word from search.summary_wordlist where "+include_words+") as u left join search.datasets as d on d.dsid = u.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" group by d.dsid,word order by d.type,trank",parameter_types,parameters,pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank,word from (select dsid,word from search.title_wordlist where "+include_words+" union select dsid,word from search.summary_wordlist where "+include_words+") as u left join search.datasets as d on d.dsid = u.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" group by d.dsid,word order by d.type,trank",parameter_types,parameters,pstmt,pstmt_error);
     }
     else {
-	pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join (select dsid from search.title_wordlist where "+exclude_words+" union select dsid from search.summary_wordlist where "+exclude_words+") as u on u.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(u.dsid) group by d.dsid order by d.type,trank",parameter_types,parameters,pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select distinct d.dsid,d.title,d.summary,d.type,max(t.rank) as trank from search.datasets as d left join (select dsid from search.title_wordlist where "+exclude_words+" union select dsid from search.summary_wordlist where "+exclude_words+") as u on u.dsid = d.dsid left join search.GCMD_topics as t on t.dsid = d.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and isnull(u.dsid) group by d.dsid order by d.type,trank",parameter_types,parameters,pstmt,pstmt_error);
     }
   }
   else if (local_args.url_input.browse_by == "recent") {
     if (prev_results_table.size() > 0) {
-	redirect_to_error();
+      redirect_to_error();
     }
     else {
-	pstmt_good=run_prepared_statement(server,"select d.dsid,d.title,d.summary,d.type,max(mssdate) as dm from dssdb.dataset as m left join search.datasets as d on concat('ds',d.dsid) = m.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and mssdate >= '"+dateutils::current_date_time().days_subtracted(60).to_string("%Y-%m-%d")+"' group by d.dsid order by d.type,dm desc",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select d.dsid,d.title,d.summary,d.type,max(mssdate) as dm from dssdb.dataset as m left join search.datasets as d on concat('ds',d.dsid) = m.dsid where "+INDEXABLE_DATASET_CONDITIONS+" and mssdate >= '"+dateutils::current_date_time().days_subtracted(60).to_string("%Y-%m-%d")+"' group by d.dsid order by d.type,dm desc",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
   }
   else if (local_args.url_input.browse_by == "doi") {
     if (prev_results_table.size() > 0) {
-	redirect_to_error();
+      redirect_to_error();
     }
     else {
-	pstmt_good=run_prepared_statement(server,"select d.dsid,d.title,d.summary,d.type from dssdb.dsvrsn as v left join search.datasets as d on concat('ds',d.dsid) = v.dsid where v.status = 'A' and (d.type = 'P' or d.type = 'H') order by d.type,d.dsid",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select d.dsid,d.title,d.summary,d.type from dssdb.dsvrsn as v left join search.datasets as d on concat('ds',d.dsid) = v.dsid where v.status = 'A' and (d.type = 'P' or d.type = 'H') order by d.type,d.dsid",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
   }
   else if (local_args.url_input.browse_by == "all") {
     if (prev_results_table.size() > 0) {
-	redirect_to_error();
+      redirect_to_error();
     }
     else {
-	pstmt_good=run_prepared_statement(server,"select dsid,title,summary,type from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS+" order by type,dsid",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
+      pstmt_good=run_prepared_statement(server,"select dsid,title,summary,type from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS+" order by type,dsid",std::vector<enum_field_types>{},std::vector<std::string>{},pstmt,pstmt_error);
     }
   }
   if (pstmt_good) {
     server.disconnect();
     if (prev_results_table.size() > 0) {
-	show_datasets_after_processing(pstmt,num_entries,display_results);
+      show_datasets_after_processing(pstmt,num_entries,display_results);
     }
     else {
-	show_datasets_from_query(pstmt,display_results);
+      show_datasets_from_query(pstmt,display_results);
     }
   }
   else {
@@ -1116,7 +1116,7 @@ void display_cache() {
   std::string qstring;
   for (const auto& key : prev_results_table.keys()) {
     if (!qstring.empty()) {
-	qstring+=",";
+      qstring+=",";
     }
     qstring+="'"+key+"'";
   }
@@ -1128,18 +1128,18 @@ void display_cache() {
     auto n=0;
     size_t iterator;
     while (query.fetch_row(row)) {
-	auto snum=strutils::itos(n+1);
-	std::cout << "<div style=\"padding: 5px\" onMouseOver=\"javascript:this.style.backgroundColor='#eafaff'\" onMouseOut=\"javascript:this.style.backgroundColor='transparent'\">";
-	if (row[3] == "H") {
-	  std::cout << "<img src=\"/images/alert.gif\">&nbsp;<span style=\"color: red\">For ancillary use only - not recommended as a primary research dataset.  It has likely been superseded by newer and better datasets.</span><br>";
-	}
-	if (num_results > 1) {
-	  std::cout << "<input type=\"checkbox\" name=\"cmp\" value=\"" << row[0] << "\">&nbsp;";
-	}
-	std::cout << snum << ". <a class=\"underline\" href=\"/datasets/ds" << row[0] << "/\" target=\"_blank\"><b>" << row[1] << "</b></a> <span class=\"mediumGrayText\">(ds" << row[0] << ")</span><br>" << std::endl;
-	std::cout << "<div class=\"browseSummary\">" << searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator) << "</div>" << std::endl;
-	std::cout << "</div><br>" << std::endl;
-	++n;
+      auto snum=strutils::itos(n+1);
+      std::cout << "<div style=\"padding: 5px\" onMouseOver=\"javascript:this.style.backgroundColor='#eafaff'\" onMouseOut=\"javascript:this.style.backgroundColor='transparent'\">";
+      if (row[3] == "H") {
+        std::cout << "<img src=\"/images/alert.gif\">&nbsp;<span style=\"color: red\">For ancillary use only - not recommended as a primary research dataset.  It has likely been superseded by newer and better datasets.</span><br>";
+      }
+      if (num_results > 1) {
+        std::cout << "<input type=\"checkbox\" name=\"cmp\" value=\"" << row[0] << "\">&nbsp;";
+      }
+      std::cout << snum << ". <a class=\"underline\" href=\"/datasets/ds" << row[0] << "/\" target=\"_blank\"><b>" << row[1] << "</b></a> <span class=\"mediumGrayText\">(ds" << row[0] << ")</span><br>" << std::endl;
+      std::cout << "<div class=\"browseSummary\">" << searchutils::convert_to_expandable_summary(row[2],EXPANDABLE_SUMMARY_LENGTH,iterator) << "</div>" << std::endl;
+      std::cout << "</div><br>" << std::endl;
+      ++n;
     }
   }
   std::cout << "</form>" << std::endl;
@@ -1158,15 +1158,15 @@ void show_start() {
   query.set("select count(distinct dsid) from search.datasets as d where "+INDEXABLE_DATASET_CONDITIONS);
   if (query.submit(server) == 0) {
     if (query.fetch_row(row)) {
-	num_ds=row[0];
+      num_ds=row[0];
     }
   }
   query.set("select 'var',count(distinct s1.dsid) from (select v.dsid from search.GCMD_variables as v left join search.datasets as d on d.dsid = v.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s1 union select 'tres',count(distinct s2.dsid) from (select t.dsid from search.time_resolutions as t left join search.datasets as d on d.dsid = t.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s2 union select 'plat',count(distinct s3.dsid) from (select p.dsid from search.platforms as p left join search.datasets as d on d.dsid = p.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s3 union select 'sres',count(distinct s4.dsid) from (select g.dsid from search.grid_resolutions as g left join search.datasets as d on d.dsid = g.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s4 union select 'topic',count(distinct s5.dsid) from (select t.dsid from search.GCMD_topics as t left join search.datasets as d on d.dsid = t.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s5 union select 'proj',count(distinct s6.dsid) from (select p.dsid from search.projects as p left join search.datasets as d on d.dsid = p.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s6 union select 'type',count(distinct s7.dsid) from (select t.dsid from search.data_types as t left join search.datasets as d on d.dsid = t.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s7 union select 'supp',count(distinct s8.dsid) from (select s.dsid from search.supportedProjects_new as s left join search.datasets as d on d.dsid = s.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s8 union select 'fmt',count(distinct s9.dsid) from (select f.dsid from search.formats as f left join search.datasets as d on d.dsid = f.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s9 union select 'loc',count(distinct s10.dsid) from (select l.dsid from search.locations as l left join search.datasets as d on d.dsid = l.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s10");
   if (query.submit(server) == 0) {
     while (query.fetch_row(row)) {
-	ce.key=row[0];
-	ce.count=row[1];
-	cat_table.insert(ce);
+      ce.key=row[0];
+      ce.count=row[1];
+      cat_table.insert(ce);
     }
   }
   server.disconnect();
@@ -1241,25 +1241,25 @@ std::string set_date_time(std::string datetime,std::string flag,std::string time
   dt=datetime;
   switch (n) {
     case 1:
-	dt=dt.substr(0,4);
-	break;
+      dt=dt.substr(0,4);
+      break;
     case 2:
-	dt=dt.substr(0,7);
-	break;
+      dt=dt.substr(0,7);
+      break;
     case 3:
-	dt=dt.substr(0,10);
-	break;
+      dt=dt.substr(0,10);
+      break;
     case 4:
-	dt=dt.substr(0,13);
-	dt+=" "+time_zone;
-	break;
+      dt=dt.substr(0,13);
+      dt+=" "+time_zone;
+      break;
     case 5:
-	dt=dt.substr(0,16);
-	dt+=" "+time_zone;
-	break;
+      dt=dt.substr(0,16);
+      dt+=" "+time_zone;
+      break;
     case 6:
-	dt+=" "+time_zone;
-	break;
+      dt+=" "+time_zone;
+      break;
   }
   return dt;
 }
@@ -1311,18 +1311,18 @@ void fill_comparison_dataset(ComparisonEntry& de_ref) {
   while (query.fetch_row(row)) {
     TimeResolution tr;
     if (!de_ref.time_resolution_table.found(row[0],tr)) {
-	tr.key=row[0];
-	tr.types.reset(new std::string);
-	de_ref.time_resolution_table.insert(tr);
+      tr.key=row[0];
+      tr.types.reset(new std::string);
+      de_ref.time_resolution_table.insert(tr);
     }
     if (tr.types->length() > 0) {
-	*(tr.types)+=", ";
+      *(tr.types)+=", ";
     }
     if (row[1] == "GrML") {
-	*(tr.types)+="Grids";
+      *(tr.types)+="Grids";
     }
     else if (row[1] == "ObML") {
-	*(tr.types)+="Platform Observations";
+      *(tr.types)+="Platform Observations";
     }
   }
   de_ref.grid_resolutions.clear();
@@ -1365,7 +1365,7 @@ void write_keys(const std::list<std::string>& keys) {
   started=false;
   for (const auto& key : keys) {
     if (started) {
-	std::cout << ", ";
+      std::cout << ", ";
     }
     std::cout << key;
     started=true;
@@ -1404,13 +1404,13 @@ void write_gridded_products(GridProducts& gp) {
   }
   if (gp.found_analyses) {
     if (num > 1) {
-	std::cout << "&bull;&nbsp;";
+      std::cout << "&bull;&nbsp;";
     }
     std::cout << "Analyses<br>";
   }
   if (gp.tables.forecast.size() > 0) {
     if (num > 1) {
-	std::cout << "&bull;&nbsp;";
+      std::cout << "&bull;&nbsp;";
     }
     std::cout << "Forecasts <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.forecast.keys());
@@ -1418,7 +1418,7 @@ void write_gridded_products(GridProducts& gp) {
   }
   if (gp.tables.average.size() > 0) {
     if (num > 1) {
-	std::cout << "&bull;&nbsp;";
+      std::cout << "&bull;&nbsp;";
     }
     std::cout << "Averages <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.average.keys());
@@ -1426,7 +1426,7 @@ void write_gridded_products(GridProducts& gp) {
   }
   if (gp.tables.accumulation.size() > 0) {
     if (num > 1) {
-	std::cout << "&bull;&nbsp;";
+      std::cout << "&bull;&nbsp;";
     }
     std::cout << "Accumulations <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.accumulation.keys());
@@ -1434,7 +1434,7 @@ void write_gridded_products(GridProducts& gp) {
   }
   if (gp.tables.weekly_mean.size() > 0) {
     if (num > 1) {
-	std::cout << "&bull;&nbsp;";
+      std::cout << "&bull;&nbsp;";
     }
     std::cout << "Weekly Means <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.weekly_mean.keys());
@@ -1442,7 +1442,7 @@ void write_gridded_products(GridProducts& gp) {
   }
   if (gp.tables.monthly_mean.size() > 0) {
     if (num > 1) {
-	std::cout << "&bull;&nbsp;";
+      std::cout << "&bull;&nbsp;";
     }
     std::cout << "Monthly Means <small class=\"mediumGrayText\">";
     std::cout << "(";
@@ -1451,7 +1451,7 @@ void write_gridded_products(GridProducts& gp) {
   }
   if (gp.tables.monthly_var_covar.size() > 0) {
     if (num > 1) {
-	std::cout << "&bull;&nbsp;";
+      std::cout << "&bull;&nbsp;";
     }
     std::cout << "Monthly Variances/Covariances <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.monthly_var_covar.keys());
@@ -1459,7 +1459,7 @@ void write_gridded_products(GridProducts& gp) {
   }
   if (gp.tables.mean.size() > 0) {
     if (num > 1) {
-	std::cout << "&bull;&nbsp;";
+      std::cout << "&bull;&nbsp;";
     }
     std::cout << "Means <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.mean.keys());
@@ -1467,7 +1467,7 @@ void write_gridded_products(GridProducts& gp) {
   }
   if (gp.tables.var_covar.size() > 0) {
     if (num > 1) {
-	std::cout << "&bull;&nbsp;";
+      std::cout << "&bull;&nbsp;";
     }
     std::cout << "Variances/Covariances <small class=\"mediumGrayText\">(";
     write_keys(gp.tables.var_covar.keys());
@@ -1525,35 +1525,35 @@ void compare() {
   std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\"><nobr>Data Formats</nobr></th><td align=\"left\">";
   for (auto format : ce1.formats) {
     if (std::regex_search(format,std::regex("^proprietary_"))) {
-	strutils::replace_all(format,"proprietary_","");
-	format+=" (see dataset documentation)";
+      strutils::replace_all(format,"proprietary_","");
+      format+=" (see dataset documentation)";
     }
     if (ce1.formats.size() > 1) {
-	std::cout << "&bull;&nbsp;";
+      std::cout << "&bull;&nbsp;";
     }
     std::cout << strutils::to_capital(format)+"<br>";
   }
   std::cout << "</td><td align=\"left\">";
   for (auto format : ce2.formats) {
     if (std::regex_search(format,std::regex("^proprietary_"))) {
-	strutils::replace_all(format,"proprietary_","");
-	format+=" (see dataset documentation)";
+      strutils::replace_all(format,"proprietary_","");
+      format+=" (see dataset documentation)";
     }
     if (ce2.formats.size() > 1)
-	std::cout << "&bull;&nbsp;";
+      std::cout << "&bull;&nbsp;";
     std::cout << strutils::to_capital(format)+"<br>";
   }
   std::cout << "</td></tr>" << std::endl;
   std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Platforms</th><td align=\"left\">";
   for (const auto& platform : ce1.platforms) {
     if (ce1.platforms.size() > 1)
-	std::cout << "&bull;&nbsp;";
+      std::cout << "&bull;&nbsp;";
     std::cout << platform+"<br>";
   }
   std::cout << "</td><td align=\"left\">";
   for (const auto& platform : ce2.platforms) {
     if (ce2.platforms.size() > 1)
-	std::cout << "&bull;&nbsp;";
+      std::cout << "&bull;&nbsp;";
     std::cout << platform+"</br>";
   }
   std::cout << "</td></tr>" << std::endl;
@@ -1569,35 +1569,35 @@ void compare() {
   if (ce1.time_resolution_table.size() > 0 || ce2.time_resolution_table.size() > 0) {
     std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Temporal Resolutions</th><td align=\"left\">";
     for (const auto& key : ce1.time_resolution_table.keys()) {
-	sdum=key;
-	strutils::replace_all(sdum,"T : ","");
-	strutils::replace_all(sdum,"-","to");
-	if (ce1.time_resolution_table.size() > 1) {
-	  std::cout << "&bull;&nbsp;";
-	}
-	if (ce1.data_types.size() > 1) {
-	  ce1.time_resolution_table.found(key,tr);
-	  std::cout << sdum+" <small class=\"mediumGrayText\">("+*(tr.types)+")</small><br>";
-	}
-	else {
-	  std::cout << sdum+"<br>";
-	}
+      sdum=key;
+      strutils::replace_all(sdum,"T : ","");
+      strutils::replace_all(sdum,"-","to");
+      if (ce1.time_resolution_table.size() > 1) {
+        std::cout << "&bull;&nbsp;";
+      }
+      if (ce1.data_types.size() > 1) {
+        ce1.time_resolution_table.found(key,tr);
+        std::cout << sdum+" <small class=\"mediumGrayText\">("+*(tr.types)+")</small><br>";
+      }
+      else {
+        std::cout << sdum+"<br>";
+      }
     }
     std::cout << "</td><td align=\"left\">";
     for (const auto& key : ce2.time_resolution_table.keys()) {
-	sdum=key;
-	strutils::replace_all(sdum,"T : ","");
-	strutils::replace_all(sdum,"-","to");
-	if (ce2.time_resolution_table.size() > 1) {
-	  std::cout << "&bull;&nbsp;";
-	}
-	if (ce2.data_types.size() > 1) {
-	  ce2.time_resolution_table.found(key,tr);
-	  std::cout << sdum+" <small class=\"mediumGrayText\">("+*(tr.types)+")</small><br>";
-	}
-	else {
-	  std::cout << sdum+"<br>";
-	}
+      sdum=key;
+      strutils::replace_all(sdum,"T : ","");
+      strutils::replace_all(sdum,"-","to");
+      if (ce2.time_resolution_table.size() > 1) {
+        std::cout << "&bull;&nbsp;";
+      }
+      if (ce2.data_types.size() > 1) {
+        ce2.time_resolution_table.found(key,tr);
+        std::cout << sdum+" <small class=\"mediumGrayText\">("+*(tr.types)+")</small><br>";
+      }
+      else {
+        std::cout << sdum+"<br>";
+      }
     }
     std::cout << "</td></tr>" << std::endl;
   }
@@ -1631,21 +1631,21 @@ void compare() {
     std::cout << "</td></tr>" << std::endl;
     std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Grid Resolution and Coverage</th><td class=\"bg0\" align=\"left\">";
     if (table_exists(server,table1)) {
-	for (const auto& coverage : gc1.coverages) {
-	  if (gc1.coverages.size() > 1) {
-	    std::cout << "&bull;&nbsp;";
-	  }
-	  std::cout << gridutils::convert_grid_definition(coverage)+"<br>";
-	}
+      for (const auto& coverage : gc1.coverages) {
+        if (gc1.coverages.size() > 1) {
+          std::cout << "&bull;&nbsp;";
+        }
+        std::cout << gridutils::convert_grid_definition(coverage)+"<br>";
+      }
     }
     std::cout << "</td><td class=\"bg0\" align=\"left\">";
     if (table_exists(server,table2)) {
-	for (const auto& coverage : gc2.coverages) {
-	  if (gc2.coverages.size() > 1) {
-	    std::cout << "&bull;&nbsp;";
-	  }
-	  std::cout << gridutils::convert_grid_definition(coverage)+"<br>";
-	}
+      for (const auto& coverage : gc2.coverages) {
+        if (gc2.coverages.size() > 1) {
+          std::cout << "&bull;&nbsp;";
+        }
+        std::cout << gridutils::convert_grid_definition(coverage)+"<br>";
+      }
     }
     std::cout << "</td></tr>" << std::endl;
     std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">GCMD Parameters</th><td class=\"bg0\" align=\"left\"><div style=\"height: 150px; overflow: auto\">";
@@ -1654,13 +1654,13 @@ void compare() {
     array.clear();
     array.reserve(elist.size());
     for (auto e : elist) {
-	sdum=e.content();
-	strutils::replace_all(sdum,"EARTH SCIENCE > ","");
-	array.emplace_back(sdum);
+      sdum=e.content();
+      strutils::replace_all(sdum,"EARTH SCIENCE > ","");
+      array.emplace_back(sdum);
     }
     binary_sort(array,compare_strings);
     for (n=0; n < elist.size(); n++)
-	std::cout << "&bull;&nbsp;"+array[n]+"<br>";
+      std::cout << "&bull;&nbsp;"+array[n]+"<br>";
     xdoc.close();
     std::cout << "</div></td><td class=\"bg0\" align=\"left\"><div style=\"height: 150px; overflow: auto\">";
     xdoc.open(SERVER_ROOT+"/web/datasets/ds"+ce2.key+"/metadata/dsOverview.xml");
@@ -1668,32 +1668,32 @@ void compare() {
     array.clear();
     array.reserve(elist.size());
     for (auto e : elist) {
-	sdum=e.content();
-	strutils::replace_all(sdum,"EARTH SCIENCE > ","");
-	array.emplace_back(sdum);
+      sdum=e.content();
+      strutils::replace_all(sdum,"EARTH SCIENCE > ","");
+      array.emplace_back(sdum);
     }
     binary_sort(array,compare_strings);
     for (n=0; n < elist.size(); n++)
-	std::cout << "&bull;&nbsp;"+array[n]+"<br>";
+      std::cout << "&bull;&nbsp;"+array[n]+"<br>";
     xdoc.close();
     std::cout << "</div></td></tr>" << std::endl;
   }
   else if (ce1.grid_resolutions.size() > 0 || ce2.grid_resolutions.size() > 0) {
     std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Grid Resolutions</th><td class=\"bg0\" align=\"left\">";
     for (auto res : ce1.grid_resolutions) {
-	strutils::replace_all(res,"H : ","");
-	strutils::replace_all(res,"-","to");
-	if (ce1.grid_resolutions.size() > 1)
-	  std::cout << "&bull;&nbsp;";
-	std::cout << res+"<br>";
+      strutils::replace_all(res,"H : ","");
+      strutils::replace_all(res,"-","to");
+      if (ce1.grid_resolutions.size() > 1)
+        std::cout << "&bull;&nbsp;";
+      std::cout << res+"<br>";
     }
     std::cout << "</td><td class=\"bg0\" align=\"left\">";
     for (auto res : ce2.grid_resolutions) {
-	strutils::replace_all(res,"H : ","");
-	strutils::replace_all(res,"-","to");
-	if (ce2.grid_resolutions.size() > 1)
-	  std::cout << "&bull;&nbsp;";
-	std::cout << res+"<br>";
+      strutils::replace_all(res,"H : ","");
+      strutils::replace_all(res,"-","to");
+      if (ce2.grid_resolutions.size() > 1)
+        std::cout << "&bull;&nbsp;";
+      std::cout << res+"<br>";
     }
     std::cout << "</td></tr>" << std::endl;
   }
@@ -1709,7 +1709,7 @@ int main(int argc,char **argv) {
   if ( (env=getenv("HTTP_HOST")) != nullptr) {
     http_host=env;
     if (http_host.empty()) {
-	web_error2("empty HTTP_HOST","400 Bad Request");
+      web_error2("empty HTTP_HOST","400 Bad Request");
     }
   }
   else {
@@ -1727,31 +1727,31 @@ int main(int argc,char **argv) {
   }
   else if (local_args.url_input.browse_by_list.size() > 0) {
     if (local_args.url_input.browse_by_list.size() != local_args.url_input.browse_value_list.size()) {
-	redirect_to_error();
+      redirect_to_error();
     }
     else {
-	auto n=0;
-	auto bb=local_args.url_input.browse_by_list.begin();
-	auto bb_end=local_args.url_input.browse_by_list.end();
-	auto bv=local_args.url_input.browse_value_list.begin();
-	for (; bb != bb_end; ++bb,++bv) {
-	  local_args.url_input.browse_by=*bb;
-	  local_args.url_input.browse_value=*bv;
-	  if (local_args.url_input.browse_by == "type") {
-	    local_args.url_input.browse_value=strutils::substitute(strutils::to_lower(local_args.url_input.browse_value)," ","_");
-	  }
-	  if (n > 0 && !local_args.new_browse) {
-	    read_cache();
-	  }
-	  browse(*bb == local_args.url_input.browse_by_list.back());
-	  ++n;
-	  local_args.new_browse=false;
-	}
+      auto n=0;
+      auto bb=local_args.url_input.browse_by_list.begin();
+      auto bb_end=local_args.url_input.browse_by_list.end();
+      auto bv=local_args.url_input.browse_value_list.begin();
+      for (; bb != bb_end; ++bb,++bv) {
+        local_args.url_input.browse_by=*bb;
+        local_args.url_input.browse_value=*bv;
+        if (local_args.url_input.browse_by == "type") {
+          local_args.url_input.browse_value=strutils::substitute(strutils::to_lower(local_args.url_input.browse_value)," ","_");
+        }
+        if (n > 0 && !local_args.new_browse) {
+          read_cache();
+        }
+        browse(*bb == local_args.url_input.browse_by_list.back());
+        ++n;
+        local_args.new_browse=false;
+      }
     }
   }
   else if (!local_args.url_input.browse_by.empty()) {
     if (local_args.url_input.browse_by == "type") {
-	local_args.url_input.browse_value=strutils::substitute(strutils::to_lower(local_args.url_input.browse_value)," ","_");
+      local_args.url_input.browse_value=strutils::substitute(strutils::to_lower(local_args.url_input.browse_value)," ","_");
     }
     browse();
   }
