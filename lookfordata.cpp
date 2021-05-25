@@ -13,101 +13,111 @@
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
-std::string myerror="";
-std::string mywarning="";
+std::string myerror = "";
+std::string mywarning = "";
 
 struct LocalArgs {
-  LocalArgs() : url_input(),lkey(),new_browse(false),display_cache(false) {}
+  LocalArgs() : url_input(), lkey(), new_browse(false), display_cache(false) { }
 
   struct UrlInput {
-    UrlInput() : refine_by(),browse_by(),browse_value(),browse_by_list(),browse_value_list(),compare_list(),origin(),from_home_page(),refine_color() {}
+    UrlInput() : refine_by(), browse_by(), browse_value(), browse_by_list(),
+        browse_value_list(), compare_list(), origin(), from_home_page(),
+        refine_color() { }
 
-    std::string refine_by,browse_by,browse_value;
-    std::list<std::string> browse_by_list,browse_value_list,compare_list;
-    std::string origin,from_home_page,refine_color;
+    std::string refine_by, browse_by, browse_value;
+    std::list<std::string> browse_by_list, browse_value_list, compare_list;
+    std::string origin, from_home_page, refine_color;
   };
 
   UrlInput url_input;
   std::string lkey;
-  bool new_browse,display_cache;
+  bool new_browse, display_cache;
 } local_args;
 
 struct DsEntry {
-  DsEntry() : key(),summary() {}
+  DsEntry() : key(), summary() { }
 
   std::string key;
   std::string summary;
 };
 
 struct BreadCrumbsEntry {
-  BreadCrumbsEntry() : key(),count(nullptr) {}
+  BreadCrumbsEntry() : key(), count(nullptr) { }
 
   std::string key;
   std::shared_ptr<std::string> count;
 };
 
 struct CountEntry {
-  CountEntry() : key(),count(nullptr) {}
+  CountEntry() : key(), count(nullptr) { }
 
   std::string key;
   std::shared_ptr<int> count;
 };
 
 struct TimeResolution {
-  TimeResolution() : key(),types(nullptr) {}
+  TimeResolution() : key(), types(nullptr) { }
 
   std::string key;
   std::shared_ptr<std::string> types;
 };
 
 struct ComparisonEntry {
-  ComparisonEntry() : key(),title(),summary(),type(),start(),end(),order(0),time_resolution_table(),data_types(),formats(),grid_resolutions(),projects(),supported_projects(),platforms() {}
+  ComparisonEntry() : key(), title(), summary(), type(), start(), end(),
+      order(0), time_resolution_table(), data_types(), formats(),
+      grid_resolutions(), projects(), supported_projects(), platforms() { }
 
   std::string key;
-  std::string title,summary,type;
-  std::string start,end;
+  std::string title, summary, type;
+  std::string start, end;
   size_t order;
   my::map<TimeResolution> time_resolution_table;
-  std::list<std::string> data_types,formats,grid_resolutions,projects,supported_projects,platforms;
+  std::list<std::string> data_types, formats, grid_resolutions, projects,
+      supported_projects, platforms;
 };
 
 struct StringEntry {
-  StringEntry() : key() {}
+  StringEntry() : key() { }
 
   std::string key;
 };
 
 struct GridProducts {
-  GridProducts() : table(),found_analyses(false),tables(),tid(0) {}
+  GridProducts() : table(), found_analyses(false), tables(), tid(0) { }
 
   std::string table;
   bool found_analyses;
   struct Tables {
-    Tables() : forecast(99999),average(99999),accumulation(99999),weekly_mean(99999),monthly_mean(99999),monthly_var_covar(99999),mean(99999),var_covar(99999) {}
+    Tables() : forecast(99999), average(99999), accumulation(99999),
+        weekly_mean(99999), monthly_mean(99999), monthly_var_covar(99999),
+        mean(99999), var_covar(99999) {}
 
-    my::map<StringEntry> forecast,average,accumulation,weekly_mean,monthly_mean,monthly_var_covar,mean,var_covar;
+    my::map<StringEntry> forecast, average, accumulation, weekly_mean,
+        monthly_mean, monthly_var_covar, mean, var_covar;
   } tables;
   pthread_t tid;
 };
 
 struct GridCoverages {
-  GridCoverages() : table(),dsnum(),coverages(),tid(0) {}
+  GridCoverages() : table(), dsnum(), coverages(), tid(0) { }
 
-  std::string table,dsnum;
+  std::string table, dsnum;
   std::list<std::string> coverages;
   pthread_t tid;
 };
 
 struct CatEntry {
-  CatEntry() : key(),count() {}
+  CatEntry() : key(), count() { }
 
   std::string key;
   std::string count;
 };
 
-const std::string SERVER_ROOT="/"+strutils::token(unixutils::host_name(),".",0);
-const std::string INDEXABLE_DATASET_CONDITIONS="(d.type = 'P' or d.type = 'H') and d.dsid < '999.0'";
-const size_t EXPANDABLE_SUMMARY_LENGTH=30;
+const std::string SERVER_ROOT = "/" + strutils::token(unixutils::host_name(),
+    ".", 0);
+const std::string INDEXABLE_DATASET_CONDITIONS = "(d.type = 'P' or d.type = "
+    "'H') and d.dsid < '999.0'";
+const size_t EXPANDABLE_SUMMARY_LENGTH = 30;
 my::map<DsEntry> prev_results_table(999);
 my::map<BreadCrumbsEntry> breadcrumbs_table;
 std::string http_host;
@@ -1583,15 +1593,15 @@ void compare() {
   server.disconnect();
 }
 
-int main(int argc,char **argv) {
-  char *env;
-  if ( (env=getenv("HTTP_HOST")) != nullptr) {
-    http_host=env;
+int main(int argc, char **argv) {
+  char *env getenv("HTTP_HOST");
+  if (env != nullptr) {
+    http_host = env;
     if (http_host.empty()) {
-      web_error2("empty HTTP_HOST","400 Bad Request");
+      web_error2("empty HTTP_HOST", "400 Bad Request");
     }
   } else {
-    web_error2("missing HTTP_HOST","400 Bad Request");
+    web_error2("missing HTTP_HOST", "400 Bad Request");
   }
   parse_query();
   if (local_args.display_cache) {
@@ -1601,30 +1611,33 @@ int main(int argc,char **argv) {
   } else if (!local_args.url_input.refine_by.empty()) {
     show_refine_results();
   } else if (local_args.url_input.browse_by_list.size() > 0) {
-    if (local_args.url_input.browse_by_list.size() != local_args.url_input.browse_value_list.size()) {
+    if (local_args.url_input.browse_by_list.size() != local_args.url_input
+        .browse_value_list.size()) {
       redirect_to_error();
     } else {
-      auto n=0;
-      auto bb=local_args.url_input.browse_by_list.begin();
-      auto bb_end=local_args.url_input.browse_by_list.end();
-      auto bv=local_args.url_input.browse_value_list.begin();
-      for (; bb != bb_end; ++bb,++bv) {
-        local_args.url_input.browse_by=*bb;
-        local_args.url_input.browse_value=*bv;
+      auto n = 0;
+      auto bb = local_args.url_input.browse_by_list.begin();
+      auto bb_end = local_args.url_input.browse_by_list.end();
+      auto bv = local_args.url_input.browse_value_list.begin();
+      for (; bb != bb_end; ++bb, ++bv) {
+        local_args.url_input.browse_by = *bb;
+        local_args.url_input.browse_value = *bv;
         if (local_args.url_input.browse_by == "type") {
-          local_args.url_input.browse_value=strutils::substitute(strutils::to_lower(local_args.url_input.browse_value)," ","_");
+          local_args.url_input.browse_value = strutils::substitute(strutils::
+              to_lower(local_args.url_input.browse_value), " ", "_");
         }
         if (n > 0 && !local_args.new_browse) {
           read_cache();
         }
         browse(*bb == local_args.url_input.browse_by_list.back());
         ++n;
-        local_args.new_browse=false;
+        local_args.new_browse = false;
       }
     }
   } else if (!local_args.url_input.browse_by.empty()) {
     if (local_args.url_input.browse_by == "type") {
-      local_args.url_input.browse_value=strutils::substitute(strutils::to_lower(local_args.url_input.browse_value)," ","_");
+      local_args.url_input.browse_value = strutils::substitute(strutils::
+          to_lower(local_args.url_input.browse_value), " ", "_");
     }
     browse();
   } else if (local_args.new_browse) {
