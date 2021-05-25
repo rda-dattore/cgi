@@ -48,13 +48,6 @@ struct LocalArgs {
   bool new_browse, display_cache;
 } local_args;
 
-struct DsEntry {
-  DsEntry() : key(), summary() { }
-
-  string key;
-  string summary;
-};
-
 struct BreadCrumbsEntry {
   BreadCrumbsEntry() : key(), count(nullptr) { }
 
@@ -143,7 +136,7 @@ const string SERVER_ROOT = "/" + strutils::token(unixutils::host_name(),
 const string INDEXABLE_DATASET_CONDITIONS = "(d.type = 'P' or d.type = "
     "'H') and d.dsid < '999.0'";
 const size_t EXPANDABLE_SUMMARY_LENGTH = 30;
-my::map<DsEntry> prev_results_table(999);
+set<string> prev_results_table;
 my::map<BreadCrumbsEntry> breadcrumbs_table;
 string http_host;
 std::ofstream cache;
@@ -308,7 +301,6 @@ void read_cache() {
   std::ifstream ifs;
   std::ofstream ofs;
   char line[256];
-  DsEntry dse;
   BreadCrumbsEntry bce;
   string rmatch,bmatch;
   int nmatch=0,n=0;
@@ -333,8 +325,9 @@ void read_cache() {
     ifs.getline(line,256);
     while (!ifs.eof()) {
       ++num_lines;
+      std::string s = line;
       if (line[0] == '@') {
-        sp=strutils::split(line,"<!>");
+        sp=strutils::split(s,"<!>");
         if (!rmatch.empty()) {
           if (sp[0] == rmatch) {
             ++n;
@@ -343,7 +336,7 @@ void read_cache() {
             }
           }
         } else if (!bmatch.empty()) {
-          if (regex_search(line,regex("^"+bmatch))) {
+          if (regex_search(s,regex("^"+bmatch))) {
             break;
           }
         }
@@ -354,11 +347,8 @@ void read_cache() {
           breadcrumbs_table.insert(bce);
         }
         prev_results_table.clear();
-      } else {
-        if (!prev_results_table.found(line,dse)) {
-          dse.key=line;
-          prev_results_table.insert(dse);
-        }
+      } else if (prev_results_table.find(s) == prev_results_table.end()) {
+        prev_results_table.insert(s);
       }
       ifs.getline(line,256);
     }
@@ -445,8 +435,7 @@ void parse_refine_query(MySQL::Query& query) {
     while (query.fetch_row(row)) {
       bool add_to_list;
       if (prev_results_table.size() > 0) {
-        DsEntry dse;
-        if (prev_results_table.found(row[1],dse)) {
+        if (prev_results_table.find(row[1]) != prev_results_table.end()) {
           add_to_list=true;
         } else {
           add_to_list=false;
@@ -741,13 +730,12 @@ void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entr
   MySQL::Row row;
   string sdum;
   size_t num_results=0,iterator;
-  DsEntry dse;
   int n=0;
   my::map<CountEntry> multi_table;
   CountEntry ce;
 
   while (pstmt.fetch_row(row)) {
-    if (prev_results_table.found(row[0],dse)) {
+    if (prev_results_table.find(row[0]) != prev_results_table.end()) {
       if (num_entries < 2) {
         ++num_results;
       } else {
@@ -775,7 +763,7 @@ void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entr
   pstmt.rewind();
   while (pstmt.fetch_row(row)) {
     ce.key="";
-    if (prev_results_table.found(row[0],dse) && (num_entries < 2 || (multi_table.found(row[0],ce) && (*ce.count) == static_cast<int>(num_entries)))) {
+    if (prev_results_table.find(row[0]) != prev_results_table.end() && (num_entries < 2 || (multi_table.found(row[0],ce) && (*ce.count) == static_cast<int>(num_entries)))) {
       if (!ce.key.empty()) {
         (*ce.count)=0;
       }
@@ -1015,11 +1003,11 @@ void display_cache() {
   auto num_results=prev_results_table.size();
   add_breadcrumbs(num_results);
   string qstring;
-  for (const auto& key : prev_results_table.keys()) {
+  for (const auto& e : prev_results_table) {
     if (!qstring.empty()) {
       qstring+=",";
     }
-    qstring+="'"+key+"'";
+    qstring += "'" + e + "'";
   }
   metautils::read_config("lookfordata","","");
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
