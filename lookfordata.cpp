@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <set>
+#include <map>
 #include <sstream>
 #include <regex>
 #include <web/web.hpp>
@@ -14,6 +15,7 @@
 
 using std::cout;
 using std::endl;
+using std::map;
 using std::regex;
 using std::regex_search;
 using std::shared_ptr;
@@ -134,13 +136,6 @@ struct GridCoverages {
   string table, dsnum;
   std::list<string> coverages;
   pthread_t tid;
-};
-
-struct CatEntry {
-  CatEntry() : key(), count() { }
-
-  string key;
-  string count;
 };
 
 const string SERVER_ROOT = "/" + strutils::token(unixutils::host_name(),
@@ -1055,8 +1050,6 @@ void display_cache() {
 void show_start() {
   MySQL::Query query;
   MySQL::Row row;
-  my::map<CatEntry> cat_table;
-  CatEntry ce;
   string num_ds;
 
   metautils::read_config("lookfordata","","");
@@ -1068,11 +1061,10 @@ void show_start() {
     }
   }
   query.set("select 'var',count(distinct s1.dsid) from (select v.dsid from search.GCMD_variables as v left join search.datasets as d on d.dsid = v.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s1 union select 'tres',count(distinct s2.dsid) from (select t.dsid from search.time_resolutions as t left join search.datasets as d on d.dsid = t.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s2 union select 'plat',count(distinct s3.dsid) from (select p.dsid from search.platforms as p left join search.datasets as d on d.dsid = p.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s3 union select 'sres',count(distinct s4.dsid) from (select g.dsid from search.grid_resolutions as g left join search.datasets as d on d.dsid = g.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s4 union select 'topic',count(distinct s5.dsid) from (select t.dsid from search.GCMD_topics as t left join search.datasets as d on d.dsid = t.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s5 union select 'proj',count(distinct s6.dsid) from (select p.dsid from search.projects as p left join search.datasets as d on d.dsid = p.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s6 union select 'type',count(distinct s7.dsid) from (select t.dsid from search.data_types as t left join search.datasets as d on d.dsid = t.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s7 union select 'supp',count(distinct s8.dsid) from (select s.dsid from search.supportedProjects_new as s left join search.datasets as d on d.dsid = s.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s8 union select 'fmt',count(distinct s9.dsid) from (select f.dsid from search.formats as f left join search.datasets as d on d.dsid = f.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s9 union select 'loc',count(distinct s10.dsid) from (select l.dsid from search.locations as l left join search.datasets as d on d.dsid = l.dsid where "+INDEXABLE_DATASET_CONDITIONS+") as s10");
+  map<string, string> cnts;
   if (query.submit(server) == 0) {
     while (query.fetch_row(row)) {
-      ce.key=row[0];
-      ce.count=row[1];
-      cat_table.insert(ce);
+      cnts.emplace(row[0], row[1]);
     }
   }
   server.disconnect();
@@ -1082,57 +1074,77 @@ void show_start() {
   cout << "<table cellspacing=\"0\" cellpadding=\"5\" border=\"0\">" << endl;
   cout << "<tr valign=\"top\">" << endl;
   cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Variable / Parameter";
-  if (cat_table.found("var",ce))
-    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  auto i = cnts.find("var");
+  if (i != cnts.end()) {
+    cout << " <small class=\"mediumGrayText\">(" << i->second << ")</small>";
+  }
   cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">A variable or parameter is the quantity that is measured, derived, or computed - e.g. the data value.</div></td>" << endl;
   cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << endl;
   cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Type of Data";
-  if (cat_table.found("type",ce))
-    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  i = cnts.find("type");
+  if (i != cnts.end()) {
+    cout << " <small class=\"mediumGrayText\">(" << i->second << ")</small>";
+  }
   cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to the type of data values - e.g. grid (interpolated or computed gridpoint data), platform observation (in-situ and remotely sensed measurements), etc.</div></td>" << endl;
   cout << "</tr>" << endl;
   cout << "<tr valign=\"top\">" << endl;
   cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Time Resolution";
-  if (cat_table.found("tres",ce))
-    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  i = cnts.find("tres");
+  if (i != cnts.end()) {
+    cout << " <small class=\"mediumGrayText\">(" << i->second << ")</small>";
+  }
   cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to the distance in time between discrete observation measurements, model product valid times, etc.</div></td>" << endl;
   cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << endl;
   cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Platform";
-  if (cat_table.found("plat",ce))
-    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  i = cnts.find("plat");
+  if (i != cnts.end()) {
+    cout << " <small class=\"mediumGrayText\">(" << i->second << ")</small>";
+  }
   cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">The platform is the entity or type of entity that acquired or computed the data (e.g. aircraft, land station, reanalysis model).</div></td>" << endl;
   cout << "</tr>" << endl;
   cout << "<tr valign=\"top\">" << endl;
   cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Spatial Resolution";
-  if (cat_table.found("sres",ce))
-    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  i = cnts.find("sres");
+  if (i != cnts.end()) {
+    cout << " <small class=\"mediumGrayText\">(" << i->second << ")</small>";
+  }
   cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to the horizontal distance between discrete gridpoints of a model product, reporting stations in a network, measurements of a moving platform, etc.</div></td>" << endl;
   cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << endl;
   cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Topic / Subtopic";
-  if (cat_table.found("topic",ce))
-    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  i = cnts.find("topic");
+  if (i != cnts.end()) {
+    cout << " <small class=\"mediumGrayText\">(" << i->second << ")</small>";
+  }
   cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">Topic and subtopic are high-level groupings of parameters - e.g. Atmosphere (topic), Clouds (subtopic of Atmosphere).</div></td>" << endl;
   cout << "</tr>" << endl;
   cout << "<tr valign=\"top\">";
   cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Project / Experiment";
-  if (cat_table.found("proj",ce))
-    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  i = cnts.find("proj");
+  if (i != cnts.end()) {
+    cout << " <small class=\"mediumGrayText\">(" << i->second << ")</small>";
+  }
   cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This is the scientific project, field campaign, or experiment that acquired the data.</div></td>" << endl;
   cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << endl;
   cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Supports Project";
-  if (cat_table.found("supp",ce))
-    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  i = cnts.find("supp");
+  if (i != cnts.end()) {
+    cout << " <small class=\"mediumGrayText\">(" << i->second << ")</small>";
+  }
   cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to data that were acquired to support a scientific project or experiment (e.g. GATE) or that can be used as ingest for a project (e.g. WRF).</div></td>" << endl;
   cout << "</tr>" << endl;
   cout << "<tr valign=\"top\">" << endl;
   cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Data Format";
-  if (cat_table.found("fmt",ce))
-    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  i = cnts.find("fmt");
+  if (i != cnts.end()) {
+    cout << " <small class=\"mediumGrayText\">(" << i->second << ")</small>";
+  }
   cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This refers to the structure of the bitstream used to encapsulate the data values in a record or file - e.g ASCII, netCDF, etc.</div></td>" << endl;
   cout << "<td>&nbsp;&nbsp;&nbsp;&nbsp;</td>" << endl;
   cout << "<td width=\"50%\"><div style=\"font-size: 16px; font-weight: bold\">Location";
-  if (cat_table.found("loc",ce))
-    cout << " <small class=\"mediumGrayText\">(" << ce.count << ")</small>";
+  i = cnts.find("loc");
+  if (i != cnts.end()) {
+    cout << " <small class=\"mediumGrayText\">(" << i->second << ")</small>";
+  }
   cout << "</div><div style=\"margin-bottom: 15px; margin-left: 10px\">This the name of the (usually geographic) location or region for which the data are valid.</div></td>" << endl;
   cout << "</tr>" << endl;
   cout << "</table>" << endl;
