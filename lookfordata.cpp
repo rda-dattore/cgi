@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <set>
 #include <sstream>
 #include <regex>
 #include <web/web.hpp>
@@ -19,6 +20,7 @@ using std::shared_ptr;
 using std::stoi;
 using std::string;
 using std::stringstream;
+using std::set;
 using std::vector;
 
 metautils::Directives metautils::directives;
@@ -86,25 +88,43 @@ struct ComparisonEntry {
       supported_projects, platforms;
 };
 
-struct StringEntry {
-  StringEntry() : key() { }
-
-  string key;
+struct ProdComp {
+  bool operator()(const string& left, const string& right) const {
+    auto l = left;
+    auto r = right;
+    if (l.find("-hour") == string::npos) {
+      l = "0-hour" + l;
+    }
+    auto n = 3 - l.find("-hour");
+    if (n > 0) {
+      l.insert(0, n, '0');
+    }
+    if (r.find("-hour") == string::npos) {
+      r = "0-hour" + r;
+    }
+    n = 3 - r.find("-hour");
+    if (n > 0) {
+      r.insert(0, n, '0');
+    }
+    if (l <= r) {
+      return true;
+    }
+    return false;
+  }
 };
 
 struct GridProducts {
-  GridProducts() : table(), found_analyses(false), tables(), tid(0) { }
+  GridProducts() : tables(), table(), found_analyses(false), tid(0) { }
 
-  string table;
-  bool found_analyses;
   struct Tables {
-    Tables() : forecast(99999), average(99999), accumulation(99999),
-        weekly_mean(99999), monthly_mean(99999), monthly_var_covar(99999),
-        mean(99999), var_covar(99999) {}
+    Tables() : forecast(), average(), accumulation(), weekly_mean(),
+        monthly_mean(), monthly_var_covar(), mean(), var_covar() {}
 
-    my::map<StringEntry> forecast, average, accumulation, weekly_mean,
+    set<string, ProdComp> forecast, average, accumulation, weekly_mean,
         monthly_mean, monthly_var_covar, mean, var_covar;
   } tables;
+  string table;
+  bool found_analyses;
   pthread_t tid;
 };
 
@@ -137,36 +157,12 @@ bool compare_strings(string& left,string& right) {
   return (left < right);
 }
 
-bool sort_nhour_keys(const string& left,const string& right) {
-  string l=left;
-  string r=right;
-  int n;
-
-  if (l.find("-hour") == string::npos) {
-    l="0-hour"+l;
-  }
-  if ( (n=3-l.find("-hour")) > 0) {
-    l.insert(0,n,'0');
-  }
-  if (r.find("-hour") == string::npos) {
-    r="0-hour"+r;
-  }
-  if ( (n=3-r.find("-hour")) > 0) {
-    r.insert(0,n,'0');
-  }
-  if (l <= r) {
-    return true;
-  }
-  return false;
-}
-
 extern "C" void *thread_summarize_grid_products(void *gpstruct) {
   MySQL::Query query;
   MySQL::Row row;
   GridProducts *g=(GridProducts *)gpstruct;
   string sdum;
   size_t fidx,aidx,cidx,zidx;
-  StringEntry se;
 
   MySQL::Server tserver(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   g->found_analyses=false;
@@ -182,65 +178,70 @@ extern "C" void *thread_summarize_grid_products(void *gpstruct) {
       } else if (fidx != string::npos && fidx < 4) {
 
         // forecasts
-        se.key=sdum.substr(0,sdum.find(" "));
-        if (!g->tables.forecast.found(se.key,se)) {
-          g->tables.forecast.insert(se);
+        auto f = sdum.substr(0, sdum.find(" "));
+        if (g->tables.forecast.find(f) == g->tables.forecast.end()) {
+          g->tables.forecast.emplace(f);
         }
       } else if (aidx != string::npos) {
 
         // averages
-        se.key=sdum.substr(0,aidx);
-        strutils::trim(se.key);
-        if (!g->tables.average.found(se.key,se)) {
-          g->tables.average.insert(se);
+        auto a = sdum.substr(0, aidx);
+        strutils::trim(a);
+        if (g->tables.average.find(a) == g->tables.average.end()) {
+          g->tables.average.emplace(a);
         }
       } else if (cidx != string::npos && cidx < 4) {
 
         // accumulations
-        se.key=sdum.substr(0,sdum.find(" "));
-        if (!g->tables.accumulation.found(se.key,se)) {
-          g->tables.accumulation.insert(se);
+        auto a = sdum.substr(0, sdum.find(" "));
+        if (g->tables.accumulation.find(a) == g->tables.accumulation.end()) {
+          g->tables.accumulation.emplace(a);
         }
       } else if (regex_search(sdum,regex("^Weekly Mean"))) {
-        se.key=sdum.substr(sdum.find("of")+3);
-        if (!g->tables.weekly_mean.found(se.key,se)) {
-          g->tables.weekly_mean.insert(se);
+        auto m = sdum.substr(sdum.find("of") + 3);
+        if (g->tables.weekly_mean.find(m) == g->tables.weekly_mean.end()) {
+          g->tables.weekly_mean.emplace(m);
         }
       } else if (regex_search(sdum,regex("^Monthly Mean"))) {
-        if ( (zidx=sdum.find("of")) != string::npos) {
-          se.key=sdum.substr(zidx+3);
-          strutils::trim(se.key);
-          if (!g->tables.monthly_mean.found(se.key,se)) {
-            g->tables.monthly_mean.insert(se);
+        zidx=sdum.find("of");
+        if (zidx != string::npos) {
+          auto m = sdum.substr(zidx + 3);
+          strutils::trim(m);
+          if (g->tables.monthly_mean.find(m) == g->tables.monthly_mean.end()) {
+            g->tables.monthly_mean.emplace(m);
           }
         }
       } else if (regex_search(sdum,regex("Mean"))) {
-        se.key="x";
-        if ( (zidx=sdum.find("of")) != string::npos) {
-          se.key=sdum.substr(zidx+3);
-          if ( (zidx=se.key.find("at")) != string::npos) {
-            se.key=se.key.substr(0,zidx);
+        std::string m = "x";
+        zidx = sdum.find("of");
+        if (zidx != string::npos) {
+          m = sdum.substr(zidx + 3);
+          zidx = m.find("at");
+          if (zidx != string::npos) {
+            m = m.substr(0, zidx);
           }
         } else {
-          if ( (zidx=sdum.find("Mean")) != string::npos) {
-            se.key=sdum.substr(0,zidx);
+          zidx=sdum.find("Mean");
+          if (zidx != string::npos) {
+            m = sdum.substr(0, zidx);
           }
         }
-        strutils::trim(se.key);
-        if (!g->tables.mean.found(se.key,se)) {
-          g->tables.mean.insert(se);
+        strutils::trim(m);
+        if (g->tables.mean.find(m) == g->tables.mean.end()) {
+          g->tables.mean.emplace(m);
         }
       } else if (regex_search(sdum,regex("^Variance/Covariance"))) {
-        se.key=sdum.substr(sdum.find("of")+3);
-        se.key=se.key.substr(se.key.find(" ")+1);
-        se.key=se.key.substr(0,se.key.find("at")-1);
-        if (!g->tables.var_covar.found(se.key,se)) {
-          g->tables.var_covar.insert(se);
+        auto v = sdum.substr(sdum.find("of") + 3);
+        v = v.substr(v.find(" ") + 1);
+        v = v.substr(0, v.find("at") - 1);
+        if (g->tables.var_covar.find(v) == g->tables.var_covar.end()) {
+          g->tables.var_covar.emplace(v);
         }
       }
     }
   }
   tserver.disconnect();
+/*
   g->tables.forecast.keysort(sort_nhour_keys);
   g->tables.average.keysort(sort_nhour_keys);
   g->tables.accumulation.keysort(sort_nhour_keys);
@@ -249,6 +250,7 @@ extern "C" void *thread_summarize_grid_products(void *gpstruct) {
   g->tables.monthly_var_covar.keysort(sort_nhour_keys);
   g->tables.mean.keysort(sort_nhour_keys);
   g->tables.var_covar.keysort(sort_nhour_keys);
+*/
   return NULL;
 }
 
@@ -1261,16 +1263,14 @@ void fill_comparison_dataset(ComparisonEntry& de_ref) {
   }
 }
 
-void write_keys(const std::list<string>& keys) {
-  bool started;
-
-  started=false;
-  for (const auto& key : keys) {
+void write_entries(const set<string, ProdComp>& s) {
+  auto started = false;
+  for (const auto& e : s) {
     if (started) {
       cout << ", ";
     }
-    cout << key;
-    started=true;
+    cout << e;
+    started = true;
   }
 }
 
@@ -1315,7 +1315,7 @@ void write_gridded_products(GridProducts& gp) {
       cout << "&bull;&nbsp;";
     }
     cout << "Forecasts <small class=\"mediumGrayText\">(";
-    write_keys(gp.tables.forecast.keys());
+    write_entries(gp.tables.forecast);
     cout << ")</small><br>";
   }
   if (gp.tables.average.size() > 0) {
@@ -1323,7 +1323,7 @@ void write_gridded_products(GridProducts& gp) {
       cout << "&bull;&nbsp;";
     }
     cout << "Averages <small class=\"mediumGrayText\">(";
-    write_keys(gp.tables.average.keys());
+    write_entries(gp.tables.average);
     cout << ")</small><br>";
   }
   if (gp.tables.accumulation.size() > 0) {
@@ -1331,7 +1331,7 @@ void write_gridded_products(GridProducts& gp) {
       cout << "&bull;&nbsp;";
     }
     cout << "Accumulations <small class=\"mediumGrayText\">(";
-    write_keys(gp.tables.accumulation.keys());
+    write_entries(gp.tables.accumulation);
     cout << ")</small><br>";
   }
   if (gp.tables.weekly_mean.size() > 0) {
@@ -1339,7 +1339,7 @@ void write_gridded_products(GridProducts& gp) {
       cout << "&bull;&nbsp;";
     }
     cout << "Weekly Means <small class=\"mediumGrayText\">(";
-    write_keys(gp.tables.weekly_mean.keys());
+    write_entries(gp.tables.weekly_mean);
     cout << ")</small><br>";
   }
   if (gp.tables.monthly_mean.size() > 0) {
@@ -1348,7 +1348,7 @@ void write_gridded_products(GridProducts& gp) {
     }
     cout << "Monthly Means <small class=\"mediumGrayText\">";
     cout << "(";
-    write_keys(gp.tables.monthly_mean.keys());
+    write_entries(gp.tables.monthly_mean);
     cout << ")</small><br>";
   }
   if (gp.tables.monthly_var_covar.size() > 0) {
@@ -1356,7 +1356,7 @@ void write_gridded_products(GridProducts& gp) {
       cout << "&bull;&nbsp;";
     }
     cout << "Monthly Variances/Covariances <small class=\"mediumGrayText\">(";
-    write_keys(gp.tables.monthly_var_covar.keys());
+    write_entries(gp.tables.monthly_var_covar);
     cout << ")</small><br>";
   }
   if (gp.tables.mean.size() > 0) {
@@ -1364,7 +1364,7 @@ void write_gridded_products(GridProducts& gp) {
       cout << "&bull;&nbsp;";
     }
     cout << "Means <small class=\"mediumGrayText\">(";
-    write_keys(gp.tables.mean.keys());
+    write_entries(gp.tables.mean);
     cout << ")</small><br>";
   }
   if (gp.tables.var_covar.size() > 0) {
@@ -1372,7 +1372,7 @@ void write_gridded_products(GridProducts& gp) {
       cout << "&bull;&nbsp;";
     }
     cout << "Variances/Covariances <small class=\"mediumGrayText\">(";
-    write_keys(gp.tables.var_covar.keys());
+    write_entries(gp.tables.var_covar);
     cout << ")</small><br>";
   }
 }
@@ -1604,7 +1604,7 @@ void compare() {
 }
 
 int main(int argc, char **argv) {
-  char *env getenv("HTTP_HOST");
+  char *env = getenv("HTTP_HOST");
   if (env != nullptr) {
     http_host = env;
     if (http_host.empty()) {
