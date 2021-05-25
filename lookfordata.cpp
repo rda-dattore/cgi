@@ -31,37 +31,35 @@ struct LocalArgs {
   std::string lkey;
   bool new_browse,display_cache;
 } local_args;
+
 struct DsEntry {
   DsEntry() : key(),summary() {}
 
   std::string key;
   std::string summary;
 };
-my::map<DsEntry> prev_results_table(999);
-const size_t EXPANDABLE_SUMMARY_LENGTH=30;
-std::string bgcolors[2];
-std::string http_host;
-std::string server_root="/"+strutils::token(unixutils::host_name(),".",0);
-std::ofstream cache;
+
 struct BreadCrumbsEntry {
   BreadCrumbsEntry() : key(),count(nullptr) {}
 
   std::string key;
   std::shared_ptr<std::string> count;
 };
-my::map<BreadCrumbsEntry> breadcrumbs_table;
+
 struct CountEntry {
   CountEntry() : key(),count(nullptr) {}
 
   std::string key;
   std::shared_ptr<int> count;
 };
+
 struct TimeResolution {
   TimeResolution() : key(),types(nullptr) {}
 
   std::string key;
   std::shared_ptr<std::string> types;
 };
+
 struct ComparisonEntry {
   ComparisonEntry() : key(),title(),summary(),type(),start(),end(),order(0),time_resolution_table(),data_types(),formats(),grid_resolutions(),projects(),supported_projects(),platforms() {}
 
@@ -72,11 +70,13 @@ struct ComparisonEntry {
   my::map<TimeResolution> time_resolution_table;
   std::list<std::string> data_types,formats,grid_resolutions,projects,supported_projects,platforms;
 };
+
 struct StringEntry {
   StringEntry() : key() {}
 
   std::string key;
 };
+
 struct GridProducts {
   GridProducts() : table(),found_analyses(false),tables(),tid(0) {}
 
@@ -89,6 +89,7 @@ struct GridProducts {
   } tables;
   pthread_t tid;
 };
+
 struct GridCoverages {
   GridCoverages() : table(),dsnum(),coverages(),tid(0) {}
 
@@ -96,15 +97,27 @@ struct GridCoverages {
   std::list<std::string> coverages;
   pthread_t tid;
 };
-const std::string INDEXABLE_DATASET_CONDITIONS="(d.type = 'P' or d.type = 'H') and d.dsid < '999.0'";
 
-bool compare_strings(std::string& left,std::string& right)
-{
+struct CatEntry {
+  CatEntry() : key(),count() {}
+
+  std::string key;
+  std::string count;
+};
+
+const std::string SERVER_ROOT="/"+strutils::token(unixutils::host_name(),".",0);
+const std::string INDEXABLE_DATASET_CONDITIONS="(d.type = 'P' or d.type = 'H') and d.dsid < '999.0'";
+const size_t EXPANDABLE_SUMMARY_LENGTH=30;
+my::map<DsEntry> prev_results_table(999);
+my::map<BreadCrumbsEntry> breadcrumbs_table;
+std::string http_host;
+std::ofstream cache;
+
+bool compare_strings(std::string& left,std::string& right) {
   return (left < right);
 }
 
-bool sort_nhour_keys(const std::string& left,const std::string& right)
-{
+bool sort_nhour_keys(const std::string& left,const std::string& right) {
   std::string l=left;
   std::string r=right;
   int n;
@@ -129,8 +142,7 @@ bool sort_nhour_keys(const std::string& left,const std::string& right)
   }
 }
 
-extern "C" void *thread_summarize_grid_products(void *gpstruct)
-{
+extern "C" void *thread_summarize_grid_products(void *gpstruct) {
   MySQL::Query query;
   MySQL::Row row;
   GridProducts *g=(GridProducts *)gpstruct;
@@ -227,8 +239,7 @@ extern "C" void *thread_summarize_grid_products(void *gpstruct)
   return NULL;
 }
 
-extern "C" void *thread_summarize_grid_coverages(void *gcstruct)
-{
+extern "C" void *thread_summarize_grid_coverages(void *gcstruct) {
   GridCoverages *g=(GridCoverages *)gcstruct;
   MySQL::Server tserver(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::Query query("select distinct d.definition,d.defParams from "+g->table+" as s left join GrML.gridDefinitions as d on d.code = s.gridDefinition_code where s.dsid = '"+g->dsnum+"'");
@@ -241,8 +252,7 @@ extern "C" void *thread_summarize_grid_coverages(void *gcstruct)
   return NULL;
 }
 
-std::string category(std::string short_name)
-{
+std::string category(std::string short_name) {
   std::string long_name;
 
   if (short_name == "var") {
@@ -301,8 +311,7 @@ std::string category(std::string short_name)
   }
 }
 
-void read_cache()
-{
+void read_cache() {
   std::ifstream ifs;
   std::ofstream ofs;
   char line[256];
@@ -314,7 +323,7 @@ void read_cache()
   TempFile *tfile=NULL;
   std::deque<std::string> sp;
 
-  ifs.open((server_root+"/tmp/browse."+local_args.lkey).c_str());
+  ifs.open((SERVER_ROOT+"/tmp/browse."+local_args.lkey).c_str());
   if (ifs.is_open()) {
     if (std::regex_search(local_args.url_input.refine_by,std::regex("^@"))) {
 	sp=strutils::split(local_args.url_input.refine_by,"-");
@@ -378,19 +387,17 @@ void read_cache()
     ifs.close();
     if (tfile != NULL) {
 	std::stringstream oss,ess;
-	unixutils::mysystem2("/bin/mv "+tfile->name()+" "+server_root+"/tmp/browse."+local_args.lkey,oss,ess);
+	unixutils::mysystem2("/bin/mv "+tfile->name()+" "+SERVER_ROOT+"/tmp/browse."+local_args.lkey,oss,ess);
     }
   }
 }
 
-void redirect_to_error()
-{
+void redirect_to_error() {
   std::cout << "Location: /index.html?hash=error&code=404" << std::endl << std::endl;
   exit(1);
 }
 
-void parse_query()
-{
+void parse_query() {
   QueryString query_string(QueryString::GET);
   if (!query_string) {
     redirect_to_error();
@@ -434,15 +441,14 @@ void parse_query()
   }
   else {
     if (!local_args.lkey.empty()) {
-	system(("rm -f "+server_root+"/tmp/browse."+local_args.lkey).c_str());
+	system(("rm -f "+SERVER_ROOT+"/tmp/browse."+local_args.lkey).c_str());
     }
     local_args.lkey=strutils::strand(30);
     std::cout << "Set-Cookie: lkey=" << local_args.lkey << "; domain=" << http_host << "; path=/;" << std::endl;
   }
 }
 
-void parse_refine_query(MySQL::Query& query)
-{
+void parse_refine_query(MySQL::Query& query) {
   metautils::read_config("lookfordata","","");
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   my::map<CountEntry> keyword_count_table;
@@ -582,8 +588,7 @@ void parse_refine_query(MySQL::Query& query)
   server.disconnect();
 }
 
-void show_refine_results()
-{
+void show_refine_results() {
   MySQL::Query query;
   if (local_args.url_input.refine_by == "var") {
     if (prev_results_table.size() > 0) {
@@ -695,23 +700,20 @@ void show_refine_results()
   }
 }
 
-void open_cache_for_writing()
-{
+void open_cache_for_writing() {
   if (local_args.new_browse) {
-    cache.open((server_root+"/tmp/browse."+local_args.lkey).c_str());
+    cache.open((SERVER_ROOT+"/tmp/browse."+local_args.lkey).c_str());
   }
   else {
-    cache.open((server_root+"/tmp/browse."+local_args.lkey).c_str(),std::fstream::app);
+    cache.open((SERVER_ROOT+"/tmp/browse."+local_args.lkey).c_str(),std::fstream::app);
   }
 }
 
-void close_cache()
-{
+void close_cache() {
   cache.close();
 }
 
-void add_breadcrumbs(size_t num_results)
-{
+void add_breadcrumbs(size_t num_results) {
   my::map<CountEntry> count_table;
   CountEntry ce;
   std::string breadcrumbs="Showing datasets with these attributes: ";
@@ -800,8 +802,7 @@ void add_breadcrumbs(size_t num_results)
   }
 }
 
-void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entries,bool display_results)
-{
+void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entries,bool display_results) {
   MySQL::Row row;
   std::string sdum;
   size_t num_results=0,iterator;
@@ -868,8 +869,7 @@ void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entr
   }
 }
 
-void show_datasets_from_query(MySQL::PreparedStatement& pstmt,bool display_results)
-{
+void show_datasets_from_query(MySQL::PreparedStatement& pstmt,bool display_results) {
   MySQL::Row row;
   std::string sdum;
   int n=0;
@@ -906,8 +906,7 @@ void show_datasets_from_query(MySQL::PreparedStatement& pstmt,bool display_resul
   close_cache();
 }
 
-void browse(bool display_results = true)
-{
+void browse(bool display_results = true) {
   metautils::read_config("lookfordata","","");
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   int num_entries=0;
@@ -1089,8 +1088,6 @@ void browse(bool display_results = true)
   }
   if (pstmt_good) {
     server.disconnect();
-    bgcolors[0]="#ffffff";
-    bgcolors[1]="#f8fcff";
     if (prev_results_table.size() > 0) {
 	show_datasets_after_processing(pstmt,num_entries,display_results);
     }
@@ -1104,15 +1101,7 @@ std::cerr << "LOOKFORDATA query failed with error " << pstmt_error << ": '" << p
   }
 }
 
-struct CatEntry {
-  CatEntry() : key(),count() {}
-
-  std::string key;
-  std::string count;
-};
-
-void display_cache()
-{
+void display_cache() {
   breadcrumbs_table.clear();
   read_cache();
   std::cout << "Content-type: text/html" << std::endl << std::endl;
@@ -1157,8 +1146,7 @@ void display_cache()
   server.disconnect();
 }
 
-void show_start()
-{
+void show_start() {
   MySQL::Query query;
   MySQL::Row row;
   my::map<CatEntry> cat_table;
@@ -1245,8 +1233,7 @@ void show_start()
   server.disconnect();
 }
 
-std::string set_date_time(std::string datetime,std::string flag,std::string time_zone)
-{
+std::string set_date_time(std::string datetime,std::string flag,std::string time_zone) {
   std::string dt;
   size_t n;
   
@@ -1277,8 +1264,7 @@ std::string set_date_time(std::string datetime,std::string flag,std::string time
   return dt;
 }
 
-void fill_comparison_dataset(ComparisonEntry& de_ref)
-{
+void fill_comparison_dataset(ComparisonEntry& de_ref) {
   metautils::read_config("lookfordata","","");
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::Query query("title,type","search.datasets","dsid = '"+de_ref.key+"'");
@@ -1373,8 +1359,7 @@ void fill_comparison_dataset(ComparisonEntry& de_ref)
   }
 }
 
-void write_keys(const std::list<std::string>& keys)
-{
+void write_keys(const std::list<std::string>& keys) {
   bool started;
 
   started=false;
@@ -1387,8 +1372,7 @@ void write_keys(const std::list<std::string>& keys)
   }
 }
 
-void write_gridded_products(GridProducts& gp)
-{
+void write_gridded_products(GridProducts& gp) {
   size_t num=0;
 
   if (gp.found_analyses) {
@@ -1491,8 +1475,7 @@ void write_gridded_products(GridProducts& gp)
   }
 }
 
-void compare()
-{
+void compare() {
   XMLDocument xdoc;
   std::list<XMLElement> elist;
   ComparisonEntry ce1,ce2;
@@ -1666,7 +1649,7 @@ void compare()
     }
     std::cout << "</td></tr>" << std::endl;
     std::cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">GCMD Parameters</th><td class=\"bg0\" align=\"left\"><div style=\"height: 150px; overflow: auto\">";
-    xdoc.open(server_root+"/web/datasets/ds"+ce1.key+"/metadata/dsOverview.xml");
+    xdoc.open(SERVER_ROOT+"/web/datasets/ds"+ce1.key+"/metadata/dsOverview.xml");
     elist=xdoc.element_list("dsOverview/variable@vocabulary=GCMD");
     array.clear();
     array.reserve(elist.size());
@@ -1680,7 +1663,7 @@ void compare()
 	std::cout << "&bull;&nbsp;"+array[n]+"<br>";
     xdoc.close();
     std::cout << "</div></td><td class=\"bg0\" align=\"left\"><div style=\"height: 150px; overflow: auto\">";
-    xdoc.open(server_root+"/web/datasets/ds"+ce2.key+"/metadata/dsOverview.xml");
+    xdoc.open(SERVER_ROOT+"/web/datasets/ds"+ce2.key+"/metadata/dsOverview.xml");
     elist=xdoc.element_list("dsOverview/variable@vocabulary=GCMD");
     array.clear();
     array.reserve(elist.size());
@@ -1721,8 +1704,7 @@ void compare()
   server.disconnect();
 }
 
-int main(int argc,char **argv)
-{
+int main(int argc,char **argv) {
   char *env;
   if ( (env=getenv("HTTP_HOST")) != nullptr) {
     http_host=env;
