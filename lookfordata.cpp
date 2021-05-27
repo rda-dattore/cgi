@@ -55,13 +55,6 @@ struct BreadCrumbsEntry {
   shared_ptr<string> count;
 };
 
-struct CountEntry {
-  CountEntry() : key(), count(nullptr) { }
-
-  string key;
-  shared_ptr<int> count;
-};
-
 struct TimeResolution {
   TimeResolution() : key(), types(nullptr) { }
 
@@ -641,10 +634,9 @@ void open_cache_for_writing() {
 }
 
 void add_breadcrumbs(size_t num_results) {
-  my::map<CountEntry> count_table;
-  CountEntry ce;
   string breadcrumbs="Showing datasets with these attributes: ";
   cout << "<div id=\"breadcrumbs\" style=\"background-color: #9cc991; padding: 5px; margin-top: 3px; margin-bottom: 10px; font-size: 13px\">" << breadcrumbs;
+  map<string, int> count_table;
   auto n=0;
   for (const auto& key : breadcrumbs_table.keys()) {
     if (n > 0) {
@@ -664,34 +656,29 @@ void add_breadcrumbs(size_t num_results) {
       breadcrumbs+=" <b>&gt;</b> ";
     }
     breadcrumbs+="<a style=&quot;font-weight: bold; padding-left: 5px&quot; href=&quot;javascript:void(0)&quot; onClick=&quot;javascript:slideOutFrom(\\'"+kparts[0];
-    if (!count_table.found(kparts[0],ce)) {
-      ce.key=kparts[0];
-      ce.count.reset(new int);
-      *ce.count=1;
-      count_table.insert(ce);
+    if (count_table.find(kparts[0]) == count_table.end()) {
+      count_table.emplace(kparts[0], 1);
     } else {
-      ++(*ce.count);
+      ++count_table[kparts[0]];
     }
-    cout << "-" << *ce.count << "','')\"><nobr>" << category(kparts[0]) << "</nobr></a> : " << bval << " <span class=\"mediumGrayText\">(" << *bce.count << ")</span>";
-    breadcrumbs+="-"+strutils::itos(*ce.count)+"\\',\\'\\')&quot;><nobr>"+category(kparts[0])+"</nobr></a> : "+bval+" <span class=&quot;mediumGrayText&quot;>("+*bce.count+")</span>";
+    cout << "-" << count_table[kparts[0]] << "','')\"><nobr>" << category(kparts[0]) << "</nobr></a> : " << bval << " <span class=\"mediumGrayText\">(" << *bce.count << ")</span>";
+    breadcrumbs+="-"+strutils::itos(count_table[kparts[0]])+"\\',\\'\\')&quot;><nobr>"+category(kparts[0])+"</nobr></a> : "+bval+" <span class=&quot;mediumGrayText&quot;>("+*bce.count+")</span>";
     ++n;
   }
   if (n > 0) {
     cout << " <b>&gt;</b> ";
   }
-  cout << "<a style=\"font-weight: bold; padding-left: 5px\" href=\"javascript:void(0)\" onClick=\"javascript:document.getElementById('breadcrumbs').innerHTML='"+breadcrumbs+"';slideOutFrom('" << local_args.url_input.browse_by;
-  if (!count_table.found(local_args.url_input.browse_by,ce)) {
-    ce.key=local_args.url_input.browse_by;
-    ce.count.reset(new int);
-    *ce.count=1;
-    count_table.insert(ce);
+  auto& k = local_args.url_input.browse_by;
+  cout << "<a style=\"font-weight: bold; padding-left: 5px\" href=\"javascript:void(0)\" onClick=\"javascript:document.getElementById('breadcrumbs').innerHTML='"+breadcrumbs+"';slideOutFrom('" << k;
+  if (count_table.find(k) == count_table.end()) {
+    count_table.emplace(k, 1);
   } else {
-    ++(*ce.count);
+    ++count_table[k];
   }
-  cout << "-" << *ce.count << "','')\"><nobr>" << category(local_args.url_input.browse_by) << "</nobr></a> : ";
-  if (local_args.url_input.browse_by == "var" || local_args.url_input.browse_by == "type") {
+  cout << "-" << count_table[k] << "','')\"><nobr>" << category(k) << "</nobr></a> : ";
+  if (k == "var" || k == "type") {
     cout << strutils::capitalize(local_args.url_input.browse_value);
-  } else if (local_args.url_input.browse_by == "ftext") {
+  } else if (k == "ftext") {
     cout << "'" << local_args.url_input.browse_value << "'";
   } else {
     cout << local_args.url_input.browse_value;
@@ -728,22 +715,18 @@ void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entr
   string sdum;
   size_t num_results=0,iterator;
   int n=0;
-  my::map<CountEntry> multi_table;
-  CountEntry ce;
 
+  map<string, int> multi_table;
   while (pstmt.fetch_row(row)) {
     if (prev_results_table.find(row[0]) != prev_results_table.end()) {
       if (num_entries < 2) {
         ++num_results;
       } else {
-        if (!multi_table.found(row[0],ce)) {
-          ce.key=row[0];
-          ce.count.reset(new int);
-          (*ce.count)=0;
-          multi_table.insert(ce);
+        if (multi_table.find(row[0]) == multi_table.end()) {
+          multi_table.emplace(row[0], 0);
         }
-        ++(*ce.count);
-        if ((*ce.count) == num_entries) {
+        ++multi_table[row[0]];
+        if (multi_table[row[0]] == num_entries) {
           ++num_results;
         }
       }
@@ -759,11 +742,8 @@ void show_datasets_after_processing(MySQL::PreparedStatement& pstmt,int num_entr
   }
   pstmt.rewind();
   while (pstmt.fetch_row(row)) {
-    ce.key="";
-    if (prev_results_table.find(row[0]) != prev_results_table.end() && (num_entries < 2 || (multi_table.found(row[0],ce) && (*ce.count) == static_cast<int>(num_entries)))) {
-      if (!ce.key.empty()) {
-        (*ce.count)=0;
-      }
+    if (prev_results_table.find(row[0]) != prev_results_table.end() && (num_entries < 2 || (multi_table.find(row[0]) != multi_table.end() && multi_table[row[0]] == num_entries))) {
+      multi_table.erase(row[0]);
       cache << row[0] << endl;
       sdum=strutils::itos(n+1);
       if (display_results) {
