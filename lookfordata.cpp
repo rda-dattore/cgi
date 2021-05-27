@@ -429,7 +429,7 @@ void parse_query() {
 void parse_refine_query(MySQL::Query& query) {
   metautils::read_config("lookfordata","","");
   MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  my::map<CountEntry> keyword_count_table;
+  vector<std::tuple<string, int>> kw_cnts;
   if (query.submit(server) == 0) {
     MySQL::Row row;
     while (query.fetch_row(row)) {
@@ -444,35 +444,44 @@ void parse_refine_query(MySQL::Query& query) {
         add_to_list=true;
       }
       if (add_to_list) {
-        CountEntry ce;
+        std::string key;
         if (row[0].empty()) {
-          ce.key="Not specified";
+          key = "Not specified";
         } else if (local_args.url_input.refine_by == "loc") {
-          ce.key=strutils::substitute(row[0],"United States Of America","USA");
+          key = strutils::substitute(row[0], "United States Of America", "USA");
         } else if (local_args.url_input.refine_by == "prog") {
           if (row[0] == "Y") {
-            ce.key="Continually Updated";
+            key = "Continually Updated";
           } else if (row[0] == "N") {
-            ce.key="Complete";
+            key = "Complete";
           }
         } else {
-          ce.key=row[0];
+          key = row[0];
         }
-        strutils::trim(ce.key);
+        strutils::trim(key);
         BreadCrumbsEntry bce;
-        if (breadcrumbs_table.size() == 0 || !breadcrumbs_table.found(local_args.url_input.refine_by+"<!>"+ce.key,bce)) {
+        if (breadcrumbs_table.size() == 0 || !breadcrumbs_table.found(local_args.url_input.refine_by+"<!>"+key,bce)) {
           if (local_args.url_input.refine_by == "type") {
-            ce.key=strutils::capitalize(ce.key);
+            key = strutils::capitalize(key);
           }
-          if (!keyword_count_table.found(ce.key,ce)) {
-            ce.count.reset(new int);
-            *ce.count=0;
-            keyword_count_table.insert(ce);
-          }
+          int n;
           if (prev_results_table.size() > 0) {
-            ++(*ce.count);
+            n = 1;
           } else {
-            (*ce.count)+=stoi(row[1]);
+            n = stoi(row[1]);
+          }
+          auto i = std::find_if(kw_cnts.begin(), kw_cnts.end(),
+              [key](const std::tuple<string, int>& t) -> bool {
+                if (std::get<0>(t) == key) {
+                  return true;
+                }
+                return false;
+              });
+          if (i == kw_cnts.end()) {
+            kw_cnts.emplace_back(std::make_tuple(key, n));
+          }
+          else {
+            std::get<1>(*i) += n;
           }
         }
       }
@@ -483,61 +492,49 @@ void parse_refine_query(MySQL::Query& query) {
   if (local_args.url_input.from_home_page != "yes") {
     cout << "<div style=\"font-size: 16px; font-weight: bold; padding: 2px; text-align: center; width: auto; height: 20px; line-height: 20px\">" << category(local_args.url_input.refine_by) << "</div>";
   }
-  if (keyword_count_table.size() > 0) {
+  if (kw_cnts.size() > 0) {
     if (local_args.url_input.refine_by.substr(1) != "res") {
-      keyword_count_table.keysort(
-      [](string& left,string& right) -> bool
-      {
-        string l,r;
-
-        if (left == "Not specified") {
-          return true;
-        } else if (right == "Not specified") {
-          return true;
-        } else {
-          l=strutils::substitute(strutils::to_lower(left),"proprietary_","");
-          r=strutils::substitute(strutils::to_lower(right),"proprietary_","");
-          if (l <= r) {
-            return true;
-          } else {
-            return false;
-          }
-        }
-      });
+      std::sort(kw_cnts.begin(), kw_cnts.end(),
+          [](const std::tuple<string, int>& left, const std::tuple<string, int>&
+              right) -> bool {
+            if (std::get<0>(left) == "Not specified") {
+              return true;
+            } else if (std::get<0>(right) == "Not specified") {
+              return false;
+            } else {
+              auto l = strutils::substitute(strutils::to_lower(std::get<0>(
+                  left)), "proprietary_", "");
+              auto r = strutils::substitute(strutils::to_lower(std::get<0>(
+                  right)), "proprietary_", "");
+              return l <= r;
+            }
+          });
     }
-    for (const auto& key : keyword_count_table.keys()) {
-      CountEntry ce;
-      keyword_count_table.found(key,ce);
+    for (const auto& e : kw_cnts) {
       cout << "<div style=\"background-color: " << local_args.url_input.refine_color << "; margin-bottom: 1px\"><table style=\"font-size: 13px\"><tr valign=\"top\"><td>&nbsp;&bull;</td><td>";
       if (local_args.url_input.from_home_page == "yes") {
-        cout << "<a href=\"/index.html#!lfd?b=" << local_args.url_input.refine_by << "&v=" << key << "\" onClick=\"javascript:slideUp('refine-slider')\">";
+        cout << "<a href=\"/index.html#!lfd?b=" << local_args.url_input.refine_by << "&v=" << std::get<0>(e) << "\" onClick=\"javascript:slideUp('refine-slider')\">";
       } else {
-        cout << "<a href=\"javascript:void(0)\" onClick=\"javascript:slideIn('refine-slider',function(){ document.getElementById(lastoutid).style.fontWeight='normal'; });getContent('lfd-content','/cgi-bin/lookfordata?b=" << local_args.url_input.refine_by << "&v=" << key << "')\">";
+        cout << "<a href=\"javascript:void(0)\" onClick=\"javascript:slideIn('refine-slider',function(){ document.getElementById(lastoutid).style.fontWeight='normal'; });getContent('lfd-content','/cgi-bin/lookfordata?b=" << local_args.url_input.refine_by << "&v=" << std::get<0>(e) << "')\">";
       }
       if (local_args.url_input.refine_by == "proj" || local_args.url_input.refine_by == "supp") {
         size_t idx;
-        if ( (idx=key.find(">")) != string::npos) {
-          cout << "<b>" << key.substr(0,idx) << "</b>" << key.substr(idx);
+        if ( (idx=std::get<0>(e).find(">")) != string::npos) {
+          cout << "<b>" << std::get<0>(e).substr(0,idx) << "</b>" << std::get<0>(e).substr(idx);
         } else {
-//          if (key == "Not specified") {
-            cout << key;
-/*
-          } else {
-            cout << "<b>" << key << "</b>";
-          }
-*/
+          cout << std::get<0>(e);
         }
       } else if (local_args.url_input.refine_by == "fmt") {
-        auto fmt=strutils::substitute(key,"proprietary_","");
+        auto fmt=strutils::substitute(std::get<0>(e),"proprietary_","");
         cout << strutils::to_capital(fmt);
       } else {
-        if (key == strutils::to_upper(key)) {
-          cout << strutils::capitalize(key);
+        if (std::get<0>(e) == strutils::to_upper(std::get<0>(e))) {
+          cout << strutils::capitalize(std::get<0>(e));
         } else {
-          cout << key;
+          cout << std::get<0>(e);
         }
       }
-      cout << "</a> <small class=\"mediumGrayText\">(" << *(ce.count) << ")</small>" << "</td></tr></table></div>" << endl;
+      cout << "</a> <small class=\"mediumGrayText\">(" << std::get<1>(e) << ")</small>" << "</td></tr></table></div>" << endl;
     }
     cout << "<div style=\"background-color: " << local_args.url_input.refine_color << "; line-height: 1px\">&nbsp;</div>";
     cout << endl;
