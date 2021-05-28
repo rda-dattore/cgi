@@ -15,6 +15,8 @@
 
 using std::cout;
 using std::endl;
+using std::find_if;
+using std::make_tuple;
 using std::map;
 using std::regex;
 using std::regex_search;
@@ -23,6 +25,7 @@ using std::stoi;
 using std::string;
 using std::stringstream;
 using std::set;
+using std::tuple;
 using std::vector;
 
 metautils::Directives metautils::directives;
@@ -47,13 +50,6 @@ struct LocalArgs {
   string lkey;
   bool new_browse, display_cache;
 } local_args;
-
-struct BreadCrumbsEntry {
-  BreadCrumbsEntry() : key(), count(nullptr) { }
-
-  string key;
-  shared_ptr<string> count;
-};
 
 struct TimeResolution {
   TimeResolution() : key(), types(nullptr) { }
@@ -130,13 +126,22 @@ const string INDEXABLE_DATASET_CONDITIONS = "(d.type = 'P' or d.type = "
     "'H') and d.dsid < '999.0'";
 const size_t EXPANDABLE_SUMMARY_LENGTH = 30;
 set<string> prev_results_table;
-my::map<BreadCrumbsEntry> breadcrumbs_table;
+vector<tuple<string, string>> breadcrumbs_table;
 string http_host;
 std::ofstream cache;
 
 bool compare_strings(string& left,string& right) {
   return (left < right);
 }
+
+struct find_breadcrumb {
+  find_breadcrumb(string key) : key(key) { }
+  bool operator()(const tuple<string, string>& t) {
+    return std::get<0>(t) == key;
+  }
+
+  string key;
+};
 
 extern "C" void *thread_summarize_grid_products(void *gpstruct) {
   MySQL::Query query;
@@ -294,7 +299,6 @@ void read_cache() {
   std::ifstream ifs;
   std::ofstream ofs;
   char line[256];
-  BreadCrumbsEntry bce;
   string rmatch,bmatch;
   int nmatch=0,n=0;
   int num_lines=0;
@@ -333,11 +337,10 @@ void read_cache() {
             break;
           }
         }
-        bce.key=sp[0].substr(1)+"<!>"+sp[1];
-        if (!breadcrumbs_table.found(bce.key,bce)) {
-          bce.count.reset(new string);
-          *bce.count=sp[2];
-          breadcrumbs_table.insert(bce);
+        auto key = sp[0].substr(1) + "<!>" + sp[1];
+        if (find_if(breadcrumbs_table.begin(), breadcrumbs_table.end(),
+            find_breadcrumb(key)) == breadcrumbs_table.end()) {
+          breadcrumbs_table.emplace_back(make_tuple(key, sp[2]));
         }
         prev_results_table.clear();
       } else if (prev_results_table.find(s) == prev_results_table.end()) {
@@ -452,8 +455,9 @@ void parse_refine_query(MySQL::Query& query) {
           key = row[0];
         }
         strutils::trim(key);
-        BreadCrumbsEntry bce;
-        if (breadcrumbs_table.size() == 0 || !breadcrumbs_table.found(local_args.url_input.refine_by+"<!>"+key,bce)) {
+        if (breadcrumbs_table.size() == 0 || find_if(breadcrumbs_table.begin(),
+            breadcrumbs_table.end(), find_breadcrumb(local_args.url_input
+            .refine_by + "<!>" + key)) == breadcrumbs_table.end()) {
           if (local_args.url_input.refine_by == "type") {
             key = strutils::capitalize(key);
           }
@@ -464,7 +468,7 @@ void parse_refine_query(MySQL::Query& query) {
             n = stoi(row[1]);
           }
           auto i = std::find_if(kw_cnts.begin(), kw_cnts.end(),
-              [key](const std::tuple<string, int>& t) -> bool {
+              [&key](const std::tuple<string, int>& t) -> bool {
                 if (std::get<0>(t) == key) {
                   return true;
                 }
@@ -638,13 +642,11 @@ void add_breadcrumbs(size_t num_results) {
   cout << "<div id=\"breadcrumbs\" style=\"background-color: #9cc991; padding: 5px; margin-top: 3px; margin-bottom: 10px; font-size: 13px\">" << breadcrumbs;
   map<string, int> count_table;
   auto n=0;
-  for (const auto& key : breadcrumbs_table.keys()) {
+  for (const auto& e : breadcrumbs_table) {
     if (n > 0) {
       cout << " <b>&gt;</b> ";
     }
-    BreadCrumbsEntry bce;
-    breadcrumbs_table.found(key,bce);
-    auto kparts=strutils::split(key,"<!>");
+    auto kparts=strutils::split(std::get<0>(e), "<!>");
     auto bval=kparts[1];
     if (kparts[0] == "var" || kparts[0] == "type") {
       bval=strutils::capitalize(bval);
@@ -661,8 +663,8 @@ void add_breadcrumbs(size_t num_results) {
     } else {
       ++count_table[kparts[0]];
     }
-    cout << "-" << count_table[kparts[0]] << "','')\"><nobr>" << category(kparts[0]) << "</nobr></a> : " << bval << " <span class=\"mediumGrayText\">(" << *bce.count << ")</span>";
-    breadcrumbs+="-"+strutils::itos(count_table[kparts[0]])+"\\',\\'\\')&quot;><nobr>"+category(kparts[0])+"</nobr></a> : "+bval+" <span class=&quot;mediumGrayText&quot;>("+*bce.count+")</span>";
+    cout << "-" << count_table[kparts[0]] << "','')\"><nobr>" << category(kparts[0]) << "</nobr></a> : " << bval << " <span class=\"mediumGrayText\">(" << std::get<1>(e) << ")</span>";
+    breadcrumbs+="-"+strutils::itos(count_table[kparts[0]])+"\\',\\'\\')&quot;><nobr>"+category(kparts[0])+"</nobr></a> : "+bval+" <span class=&quot;mediumGrayText&quot;>("+std::get<1>(e)+")</span>";
     ++n;
   }
   if (n > 0) {
@@ -973,10 +975,10 @@ void display_cache() {
   cout << "Content-type: text/html" << endl << endl;
   cout << "<span class=\"fs24px bold\">Browse the RDA</span><br>" << endl;
   cout << "<form name=\"compare\" action=\"javascript:void(0)\" method=\"get\">" << endl;
-  auto bparts=strutils::split(breadcrumbs_table.keys().back(),"<!>");
+  auto bparts = strutils::split(std::get<0>(breadcrumbs_table.back()), "<!>");
   local_args.url_input.browse_by=bparts[0];
   local_args.url_input.browse_value=bparts[1];
-  breadcrumbs_table.remove(breadcrumbs_table.keys().back());
+  breadcrumbs_table.pop_back();
   auto num_results=prev_results_table.size();
   add_breadcrumbs(num_results);
   string qstring;
