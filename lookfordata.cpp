@@ -144,114 +144,106 @@ struct find_breadcrumb {
   string key;
 };
 
-extern "C" void *thread_summarize_grid_products(void *gpstruct) {
-  MySQL::Query query;
-  MySQL::Row row;
-  GridProducts *g=(GridProducts *)gpstruct;
-  string sdum;
-  size_t fidx,aidx,cidx,zidx;
-
-  MySQL::Server tserver(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  g->found_analyses=false;
-  query.set("select distinct t.timeRange from (select distinct timeRange_code from "+g->table+") as g left join GrML.timeRanges as t on t.code = g.timeRange_code");
-  if (query.submit(tserver) == 0) {
-    while (query.fetch_row(row)) {
-      sdum=row[0];
-      fidx=sdum.find("-hour Forecast");
-      aidx=sdum.find("Average");
-      cidx=sdum.find("-hour Accumulation");
-      if (sdum == "Analysis") {
-        g->found_analyses=true;
-      } else if (fidx != string::npos && fidx < 4) {
+void *thread_summarize_grid_products(void *in) {
+  GridProducts *gp = reinterpret_cast<GridProducts *>(in);
+  MySQL::Server s(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+  gp->found_analyses = false;
+  MySQL::LocalQuery q("select distinct t.timeRange from (select distinct "
+      "timeRange_code from " + gp->table + ") as g left join GrML.timeRanges "
+      "as t on t.code = g.timeRange_code");
+  if (q.submit(s) == 0) {
+    for (const auto& row : q) {
+      auto& trng = row[0];
+      auto fx = trng.find("-hour Forecast");
+      auto ax = trng.find("Average");
+      auto cx = trng.find("-hour Accumulation");
+      if (trng == "Analysis") {
+        gp->found_analyses=true;
+      } else if (fx != string::npos && fx < 4) {
 
         // forecasts
-        auto f = sdum.substr(0, sdum.find(" "));
-        if (g->tables.forecast.find(f) == g->tables.forecast.end()) {
-          g->tables.forecast.emplace(f);
+        auto f = trng.substr(0, trng.find(" "));
+        if (gp->tables.forecast.find(f) == gp->tables.forecast.end()) {
+          gp->tables.forecast.emplace(f);
         }
-      } else if (aidx != string::npos) {
+      } else if (ax != string::npos) {
 
         // averages
-        auto a = sdum.substr(0, aidx);
+        auto a = trng.substr(0, ax);
         trim(a);
-        if (g->tables.average.find(a) == g->tables.average.end()) {
-          g->tables.average.emplace(a);
+        if (gp->tables.average.find(a) == gp->tables.average.end()) {
+          gp->tables.average.emplace(a);
         }
-      } else if (cidx != string::npos && cidx < 4) {
+      } else if (cx != string::npos && cx < 4) {
 
         // accumulations
-        auto a = sdum.substr(0, sdum.find(" "));
-        if (g->tables.accumulation.find(a) == g->tables.accumulation.end()) {
-          g->tables.accumulation.emplace(a);
+        auto a = trng.substr(0, trng.find(" "));
+        if (gp->tables.accumulation.find(a) == gp->tables.accumulation.end()) {
+          gp->tables.accumulation.emplace(a);
         }
-      } else if (regex_search(sdum,regex("^Weekly Mean"))) {
-        auto m = sdum.substr(sdum.find("of") + 3);
-        if (g->tables.weekly_mean.find(m) == g->tables.weekly_mean.end()) {
-          g->tables.weekly_mean.emplace(m);
+      } else if (regex_search(trng,regex("^Weekly Mean"))) {
+        auto m = trng.substr(trng.find("of") + 3);
+        if (gp->tables.weekly_mean.find(m) == gp->tables.weekly_mean.end()) {
+          gp->tables.weekly_mean.emplace(m);
         }
-      } else if (regex_search(sdum,regex("^Monthly Mean"))) {
-        zidx=sdum.find("of");
-        if (zidx != string::npos) {
-          auto m = sdum.substr(zidx + 3);
+      } else if (regex_search(trng,regex("^Monthly Mean"))) {
+        auto zx = trng.find("of");
+        if (zx != string::npos) {
+          auto m = trng.substr(zx + 3);
           trim(m);
-          if (g->tables.monthly_mean.find(m) == g->tables.monthly_mean.end()) {
-            g->tables.monthly_mean.emplace(m);
+          if (gp->tables.monthly_mean.find(m) == gp->tables.monthly_mean
+              .end()) {
+            gp->tables.monthly_mean.emplace(m);
           }
         }
-      } else if (regex_search(sdum,regex("Mean"))) {
+      } else if (regex_search(trng,regex("Mean"))) {
         std::string m = "x";
-        zidx = sdum.find("of");
-        if (zidx != string::npos) {
-          m = sdum.substr(zidx + 3);
-          zidx = m.find("at");
-          if (zidx != string::npos) {
-            m = m.substr(0, zidx);
+        auto zx = trng.find("of");
+        if (zx != string::npos) {
+          m = trng.substr(zx + 3);
+          zx = m.find("at");
+          if (zx != string::npos) {
+            m = m.substr(0, zx);
           }
         } else {
-          zidx=sdum.find("Mean");
-          if (zidx != string::npos) {
-            m = sdum.substr(0, zidx);
+          zx=trng.find("Mean");
+          if (zx != string::npos) {
+            m = trng.substr(0, zx);
           }
         }
         trim(m);
-        if (g->tables.mean.find(m) == g->tables.mean.end()) {
-          g->tables.mean.emplace(m);
+        if (gp->tables.mean.find(m) == gp->tables.mean.end()) {
+          gp->tables.mean.emplace(m);
         }
-      } else if (regex_search(sdum,regex("^Variance/Covariance"))) {
-        auto v = sdum.substr(sdum.find("of") + 3);
+      } else if (regex_search(trng,regex("^Variance/Covariance"))) {
+        auto v = trng.substr(trng.find("of") + 3);
         v = v.substr(v.find(" ") + 1);
         v = v.substr(0, v.find("at") - 1);
-        if (g->tables.var_covar.find(v) == g->tables.var_covar.end()) {
-          g->tables.var_covar.emplace(v);
+        if (gp->tables.var_covar.find(v) == gp->tables.var_covar.end()) {
+          gp->tables.var_covar.emplace(v);
         }
       }
     }
   }
-  tserver.disconnect();
-/*
-  g->tables.forecast.keysort(sort_nhour_keys);
-  g->tables.average.keysort(sort_nhour_keys);
-  g->tables.accumulation.keysort(sort_nhour_keys);
-  g->tables.weekly_mean.keysort(sort_nhour_keys);
-  g->tables.monthly_mean.keysort(sort_nhour_keys);
-  g->tables.monthly_var_covar.keysort(sort_nhour_keys);
-  g->tables.mean.keysort(sort_nhour_keys);
-  g->tables.var_covar.keysort(sort_nhour_keys);
-*/
-  return NULL;
+  s.disconnect();
+  return nullptr;
 }
 
-extern "C" void *thread_summarize_grid_coverages(void *gcstruct) {
-  GridCoverages *g=(GridCoverages *)gcstruct;
-  MySQL::Server tserver(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
-  MySQL::Query query("select distinct d.definition,d.defParams from "+g->table+" as s left join GrML.gridDefinitions as d on d.code = s.gridDefinition_code where s.dsid = '"+g->dsnum+"'");
-  if (query.submit(tserver) == 0) {
-    for (const auto& row : query) {
-      g->coverages.emplace_back(row[0]+"<!>"+row[1]);
+void *thread_summarize_grid_coverages(void *in) {
+  GridCoverages *gc = reinterpret_cast<GridCoverages *>(in);
+  MySQL::Server s(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+  MySQL::Query q("select distinct d.definition, d.defParams from " + gc->table +
+      " as s left join GrML.gridDefinitions as d on d.code = s"
+      ".gridDefinition_code where s.dsid = '" + gc->dsnum + "'");
+  if (q.submit(s) == 0) {
+    for (const auto& row : q) {
+      gc->coverages.emplace_back(row[0] + "<!>" + row[1]);
     }
   }
-  tserver.disconnect();
-  return NULL;
+  s.disconnect();
+  return nullptr;
 }
 
 string category(string short_name) {
