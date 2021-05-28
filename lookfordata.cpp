@@ -51,13 +51,6 @@ struct LocalArgs {
   bool new_browse, display_cache;
 } local_args;
 
-struct TimeResolution {
-  TimeResolution() : key(), types(nullptr) { }
-
-  string key;
-  shared_ptr<string> types;
-};
-
 struct ComparisonEntry {
   ComparisonEntry() : key(), title(), summary(), type(), start(), end(),
       order(0), time_resolution_table(), data_types(), formats(),
@@ -67,7 +60,7 @@ struct ComparisonEntry {
   string title, summary, type;
   string start, end;
   size_t order;
-  my::map<TimeResolution> time_resolution_table;
+  vector<tuple<string, string>> time_resolution_table;
   std::list<string> data_types, formats, grid_resolutions, projects,
       supported_projects, platforms;
 };
@@ -1193,19 +1186,21 @@ void fill_comparison_dataset(ComparisonEntry& de_ref) {
     web_error("fill_comparison_dataset():\n"+query.error()+"\n"+query.show());
   }
   while (query.fetch_row(row)) {
-    TimeResolution tr;
-    if (!de_ref.time_resolution_table.found(row[0],tr)) {
-      tr.key=row[0];
-      tr.types.reset(new string);
-      de_ref.time_resolution_table.insert(tr);
+    if (find_if(de_ref.time_resolution_table.begin(), de_ref
+        .time_resolution_table.end(),
+        [&](const tuple<string, string>& t) -> bool {
+          return std::get<0>(t) == row[0];
+        }) == de_ref.time_resolution_table.end()) {
+      de_ref.time_resolution_table.emplace_back(make_tuple(row[0], ""));
     }
-    if (tr.types->length() > 0) {
-      *(tr.types)+=", ";
+    auto& types = std::get<1>(de_ref.time_resolution_table.back());
+    if (types.length() > 0) {
+      types += ", ";
     }
     if (row[1] == "GrML") {
-      *(tr.types)+="Grids";
+      types += "Grids";
     } else if (row[1] == "ObML") {
-      *(tr.types)+="Platform Observations";
+      types += "Platform Observations";
     }
   }
   de_ref.grid_resolutions.clear();
@@ -1362,7 +1357,6 @@ void compare() {
   ComparisonEntry ce1,ce2;
   string sdum;
   vector<string> array;
-  TimeResolution tr;
   string dsnum1,dsnum2,table1,table2;
   GridProducts gp1,gp2;
   GridCoverages gc1,gc2;
@@ -1396,11 +1390,11 @@ void compare() {
   cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Title</th><td align=\"left\">"+ce1.title+"</td><td align=\"left\">"+ce2.title+"</td></tr>" << endl;
   cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\"><nobr>Data Types</nobr></th><td align=\"left\">";
   for (const auto& type : ce1.data_types) {
-    cout << "&bull;&nbsp;"+strutils::capitalize(type)+"<br>";
+    cout << "&bull;&nbsp;"+strutils::to_capital(type)+"<br>";
   }
   cout << "</td><td align=\"left\">";
   for (const auto& type : ce2.data_types) {
-    cout << "&bull;&nbsp;"+strutils::capitalize(type)+"<br>";
+    cout << "&bull;&nbsp;"+strutils::to_capital(type)+"<br>";
   }
   cout << "</td></tr>" << endl;
   cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\"><nobr>Data Formats</nobr></th><td align=\"left\">";
@@ -1449,31 +1443,29 @@ void compare() {
   cout << "</td></tr>" << endl;
   if (ce1.time_resolution_table.size() > 0 || ce2.time_resolution_table.size() > 0) {
     cout << "<tr valign=\"top\"><th class=\"left\" align=\"left\">Temporal Resolutions</th><td align=\"left\">";
-    for (const auto& key : ce1.time_resolution_table.keys()) {
-      sdum=key;
+    for (const auto& e : ce1.time_resolution_table) {
+      sdum = std::get<0>(e);
       strutils::replace_all(sdum,"T : ","");
       strutils::replace_all(sdum,"-","to");
       if (ce1.time_resolution_table.size() > 1) {
         cout << "&bull;&nbsp;";
       }
       if (ce1.data_types.size() > 1) {
-        ce1.time_resolution_table.found(key,tr);
-        cout << sdum+" <small class=\"mediumGrayText\">("+*(tr.types)+")</small><br>";
+        cout << sdum+" <small class=\"mediumGrayText\">(" + std::get<1>(e) + ")</small><br>";
       } else {
         cout << sdum+"<br>";
       }
     }
     cout << "</td><td align=\"left\">";
-    for (const auto& key : ce2.time_resolution_table.keys()) {
-      sdum=key;
+    for (const auto& e : ce2.time_resolution_table) {
+      sdum = std::get<0>(e);
       strutils::replace_all(sdum,"T : ","");
       strutils::replace_all(sdum,"-","to");
       if (ce2.time_resolution_table.size() > 1) {
         cout << "&bull;&nbsp;";
       }
       if (ce2.data_types.size() > 1) {
-        ce2.time_resolution_table.found(key,tr);
-        cout << sdum+" <small class=\"mediumGrayText\">("+*(tr.types)+")</small><br>";
+        cout << sdum+" <small class=\"mediumGrayText\">(" + std::get<1>(e) + ")</small><br>";
       } else {
         cout << sdum+"<br>";
       }
