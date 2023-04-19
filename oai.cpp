@@ -6,11 +6,13 @@
 #include <MySQL.hpp>
 #include <xml.hpp>
 #include <metadata.hpp>
+#include <metadata_export.hpp>
 #include <strutils.hpp>
+#include <tokendoc.hpp>
 #include <myerror.hpp>
 
-metautils::Directives directives;
-metautils::Args args;
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
 std::string myerror="";
 std::string mywarning="";
 
@@ -112,12 +114,11 @@ void identify()
 
 void list_metadata_formats()
 {
-  MySQL::Server server;
   MySQL::LocalQuery query;
   MySQL::Row row;
   std::string dsid;
 
-  metautils::connect_to_metadata_server(server);
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   for (auto& a : oai_args) {
     if (a == "identifier") {
 	dsid=query_string.value("identifier");
@@ -212,10 +213,9 @@ void build_list(MySQL::LocalQuery& query,std::string& metadata_prefix,bool& foun
 {
   std::string wc;
   std::string from,until,set,resumption_token;
-  MySQL::Server server;
   bool other_arg=false;
 
-  metautils::connect_to_metadata_server(server);
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   found_errors=false;
   for (auto& a : oai_args) {
     if (a == "from") {
@@ -350,8 +350,7 @@ void list_identifiers()
 
 void list_records()
 {
-  MySQL::Server server;
-  metautils::connect_to_metadata_server(server);
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   MySQL::LocalQuery query;
   std::string metadata_prefix;
   bool found_errors;
@@ -362,6 +361,9 @@ void list_records()
   std::unique_ptr<TokenDocument> token_doc;
   if (metadata_prefix == "iso19115-3") {
     token_doc.reset(new TokenDocument("/usr/local/www/server_root/web/html/oai/iso19115-3.xml"));
+  }
+  else if (metadata_prefix == "iso19139") {
+    token_doc.reset(new TokenDocument("/usr/local/www/server_root/web/html/oai/iso19139.xml"));
   }
   std::cout << "  <ListRecords>" << std::endl;
   MySQL::Row row;
@@ -387,11 +389,10 @@ void list_records()
 void get_record()
 {
   std::string dsnum,identifier,metadata_prefix,sdum;
-  MySQL::Server server;
   MySQL::LocalQuery query;
   MySQL::Row row;
 
-  metautils::connect_to_metadata_server(server);
+  MySQL::Server server(metautils::directives.database_server,metautils::directives.metadb_username,metautils::directives.metadb_password,"");
   for (auto& a : oai_args) {
     if (a == "identifier") {
 	identifier=query_string.value("identifier");
@@ -462,16 +463,14 @@ void get_record()
 
 int main(int argc,char **argv)
 {
-  DateTime dt;
-
-  metautils::read_config("oai","","");
+  metautils::read_config("oai","",false);
   std::cout << "Content-type: text/xml" << std::endl << std::endl;
   std::cout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
   std::cout << "<OAI-PMH xmlns=\"http://www.openarchives.org/OAI/2.0/\"" << std::endl;
   std::cout << "         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"" << std::endl;
   std::cout << "         xsi:schemaLocation=\"http://www.openarchives.org/OAI/2.0/" << std::endl;
   std::cout << "                             http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd\">" << std::endl;
-  dt=current_date_time();
+  auto dt=dateutils::current_date_time();
   if (dt.utc_offset() == -700) {
     dt.add_hours(7);
   }
