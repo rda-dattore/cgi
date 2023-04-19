@@ -302,7 +302,7 @@ return;
     }
     else
 	from+=" 00:00:00";
-    wc+=" and timestamp_Z >= '"+from+"'";
+    wc+=" and timestamp_utc >= '"+from+"'";
   }
   if (!until.empty()) {
     if (strutils::contains(until,"T")) {
@@ -311,9 +311,9 @@ return;
     }
     else
 	until+=" 23:59:59";
-    wc+=" and timestamp_Z <= '"+until+"'";
+    wc+=" and timestamp_utc <= '"+until+"'";
   }
-  query.set("dsid,timestamp_Z","search.datasets",wc);
+  query.set("dsid,timestamp_utc","search.datasets",wc);
   if (query.submit(server) < 0) {
     std::cout << "Content-type: text/plain" << std::endl << std::endl;
     std::cout << "Database error: " << query.error() << std::endl;
@@ -426,7 +426,7 @@ void get_record()
   print_request_element();
   check_formats(metadata_prefix);
   dsnum=strutils::substitute(identifier,"oai:"+REPOSITORY_IDENTIFIER+":ds","");
-  query.set("type,timestamp_Z","search.datasets","dsid = '"+dsnum+"'");
+  query.set("type,timestamp_utc","search.datasets","dsid = '"+dsnum+"'");
   if (query.submit(server) < 0) {
     std::cout << "Content-type: text/plain" << std::endl << std::endl;
     std::cout << "Database error: " << query.error() << std::endl;
