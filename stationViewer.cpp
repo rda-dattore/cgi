@@ -644,7 +644,7 @@ void get_stations()
   }
 //std::cerr << query.show() << endl;
   if (query.submit(server) < 0) {
-    std::cerr << "STATIONVIEWER: error: '" << query.error << "' for query '" <<
+    std::cerr << "STATIONVIEWER: error: '" << query.error() << "' for query '" <<
         query.show() << "'" << endl;
     web_error("A database error occurred. Please try again later.");
   }
