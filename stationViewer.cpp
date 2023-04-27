@@ -193,7 +193,9 @@ void start()
   }
   query.set("select i.observationType_code,o.obs_type,i.platformType_code,p.platform_type from (select distinct observationType_code,platformType_code from "+db+".ds"+local_args.dsnum2+"_IDList2) as i left join "+db+".obs_types as o on o.code = i.observationType_code left join "+db+".platform_types as p on p.code = i.platformType_code order by o.obs_type,p.platform_type");
   if (query.submit(server) < 0) {
-    web_error(query.error());
+    std::cerr << "STATIONVIEWER: error: '" << query.error() << "' for query '" <<
+        query.show() << "'" << endl;
+    web_error("A database error occurred. Please try again later.");
   }
   while (query.fetch_row(row)) {
     if (!obs_table.found(row[0],ote)) {
@@ -516,7 +518,9 @@ void get_stations()
   if (!local_args.gindex.empty()) {
     query.set("wfile","dssdb.wfile","dsid = 'ds"+metautils::args.dsnum+"' and type = 'D' and status = 'P' and tindex = "+local_args.gindex);
     if (query.submit(server) < 0) {
-      web_error(server.error());
+      std::cerr << "STATIONVIEWER: error: '" << server.error() << "' for query '" <<
+          query.show() << "'" << std::endl;
+      web_error("A database error occurred. Please try again later.");
     }
     while (query.fetch_row(row)) {
       se.key=row[0];
@@ -640,7 +644,9 @@ void get_stations()
   }
 //std::cerr << query.show() << endl;
   if (query.submit(server) < 0) {
-    web_error(query.error());
+    std::cerr << "STATIONVIEWER: error: '" << query.error << "' for query '" <<
+        query.show() << "'" << endl;
+    web_error("A database error occurred. Please try again later.");
   }
   cout << "Access-Control-Allow-Origin: https://rda.ucar.edu" << endl;
   cout << "Content-type: text/plain" << endl << endl;
