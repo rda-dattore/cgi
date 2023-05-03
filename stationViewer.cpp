@@ -440,11 +440,11 @@ void get_id_info() {
     MySQL::LocalQuery id_query;
     if (option_conditions.empty()) {
       id_query.set("select code, sw_lat, sw_lon, ne_lat, ne_lon from WObML.ds" +
-          local_args.dsnum2 + "_IDs2 where id_type_code = " + sp2[0] + " and "
+          local_args.dsnum2 + "_ids where id_type_code = " + sp2[0] + " and "
           "id = '" + sp2[1] + "'");
     } else {
       id_query.set("select code, sw_lat, sw_lon, ne_lat, ne_lon from WObML.ds" +
-          local_args.dsnum2 + "_IDs2 as i left join WObML.ds" + local_args.
+          local_args.dsnum2 + "_ids as i left join WObML.ds" + local_args.
           dsnum2 + "_id_list as l on l.id_code = i.code where id_type_code = " +
           sp2[0] + " and id = '" + sp2[1] + "' and (" + option_conditions +
           ")");
@@ -554,33 +554,33 @@ void get_stations()
         lon_conditions="sw_lon >= "+local_args.wlon+"0000 and ne_lon <= "+local_args.elon+"0000";
       else
         lon_conditions="((sw_lon >= "+local_args.wlon+"0000 and sw_lon <= 1800000) or (sw_lon >= -1800000 and sw_lon <= "+local_args.elon+"0000)) and ((ne_lon >= "+local_args.wlon+"0000 and ne_lon <= 1800000) or (ne_lon >= -1800000 and ne_lon <= "+local_args.elon+"0000))";
-      query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_id_list as l left join "+db+".ds"+local_args.dsnum2+"_IDs2 as i on i.code = l.id_code "+whereConditions+" and !isnull(i.id) and sw_lat >= "+local_args.slat+"0000 and ne_lat <= "+local_args.nlat+"0000 and "+lon_conditions+" group by id_type_code,id");
+      query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_id_list as l left join "+db+".ds"+local_args.dsnum2+"_ids as i on i.code = l.id_code "+whereConditions+" and !isnull(i.id) and sw_lat >= "+local_args.slat+"0000 and ne_lat <= "+local_args.nlat+"0000 and "+lon_conditions+" group by id_type_code,id");
   }
   else if (local_args.sstn.length() > 0) {
     if (local_args.spart == "any")
-      query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_IDs2 where id like '%"+local_args.sstn+"%' group by id_type_code,id");
+      query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_ids where id like '%"+local_args.sstn+"%' group by id_type_code,id");
     else
-      query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_IDs2 where id = '"+local_args.sstn+"' group by id_type_code,id");
+      query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_ids where id = '"+local_args.sstn+"' group by id_type_code,id");
   }
   else {
-    query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_IDs2 group by id_type_code,id");
+    query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_ids group by id_type_code,id");
   }
 */
   if (!local_args.sstn.empty()) {
     if (local_args.spart == "any") {
       if (local_args.gindex.empty()) {
-        query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_IDs2 where id like '%"+local_args.sstn+"%' group by id_type_code,id");
+        query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_ids where id like '%"+local_args.sstn+"%' group by id_type_code,id");
       }
       else {
-        query.set("select i.id_type_code,i.id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000.,w.id from "+db+".ds"+local_args.dsnum2+"_IDs2 as i left join "+db+".ds"+local_args.dsnum2+"_id_list as i2 on i2.id_code = i.code left join "+db+".ds"+local_args.dsnum2+"_webfiles2 as w on w.code = i2.file_code where i.id like '%"+local_args.sstn+"%' group by i.id_type_code,i.id,w.id");
+        query.set("select i.id_type_code,i.id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000.,w.id from "+db+".ds"+local_args.dsnum2+"_ids as i left join "+db+".ds"+local_args.dsnum2+"_id_list as i2 on i2.id_code = i.code left join "+db+".ds"+local_args.dsnum2+"_webfiles2 as w on w.code = i2.file_code where i.id like '%"+local_args.sstn+"%' group by i.id_type_code,i.id,w.id");
       }
     }
     else {
       if (local_args.gindex.empty()) {
-        query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_IDs2 where id = '"+local_args.sstn+"' group by id_type_code,id");
+        query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_ids where id = '"+local_args.sstn+"' group by id_type_code,id");
       }
       else {
-        query.set("select i.id_type_code,i.id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000.,w.id from "+db+".ds"+local_args.dsnum2+"_IDs2 as i left join "+db+".ds"+local_args.dsnum2+"_id_list as i2 on i2.id_code = i.code left join "+db+".ds"+local_args.dsnum2+"_webfiles2 as w on w.code = i2.file_code where i.id = '"+local_args.sstn+"' group by i.id_type_code,i.id,w.id");
+        query.set("select i.id_type_code,i.id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000.,w.id from "+db+".ds"+local_args.dsnum2+"_ids as i left join "+db+".ds"+local_args.dsnum2+"_id_list as i2 on i2.id_code = i.code left join "+db+".ds"+local_args.dsnum2+"_webfiles2 as w on w.code = i2.file_code where i.id = '"+local_args.sstn+"' group by i.id_type_code,i.id,w.id");
       }
     }
   }
@@ -636,10 +636,10 @@ void get_stations()
       lat_conditions="(1)";
     }
     if (local_args.gindex.empty()) {
-      query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_id_list as l left join "+db+".ds"+local_args.dsnum2+"_IDs2 as i on i.code = l.id_code"+op_join+" where "+where_conditions+" and !isnull(i.id) and "+lat_conditions+" group by id_type_code,id");
+      query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_id_list as l left join "+db+".ds"+local_args.dsnum2+"_ids as i on i.code = l.id_code"+op_join+" where "+where_conditions+" and !isnull(i.id) and "+lat_conditions+" group by id_type_code,id");
     }
     else {
-      query.set("select i.id_type_code,i.id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000.,w.id from "+db+".ds"+local_args.dsnum2+"_id_list as l left join "+db+".ds"+local_args.dsnum2+"_webfiles2 as w on w.code = l.file_code left join "+db+".ds"+local_args.dsnum2+"_IDs2 as i on i.code = l.id_code"+op_join+" where "+where_conditions+" and !isnull(i.id) and "+lat_conditions+" group by i.id_type_code,i.id,w.id");
+      query.set("select i.id_type_code,i.id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000.,w.id from "+db+".ds"+local_args.dsnum2+"_id_list as l left join "+db+".ds"+local_args.dsnum2+"_webfiles2 as w on w.code = l.file_code left join "+db+".ds"+local_args.dsnum2+"_ids as i on i.code = l.id_code"+op_join+" where "+where_conditions+" and !isnull(i.id) and "+lat_conditions+" group by i.id_type_code,i.id,w.id");
     }
   }
 //std::cerr << query.show() << endl;
