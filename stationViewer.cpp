@@ -191,7 +191,7 @@ void start()
     end=dateutils::string_ll_to_date_string(sp[1]);
     ifs.close();
   }
-  query.set("select i.observation_type_code,o.obs_type,i.platform_type_code,p.platform_type from (select distinct observation_type_code,platform_type_code from "+db+".ds"+local_args.dsnum2+"_IDList2) as i left join "+db+".obs_types as o on o.code = i.observation_type_code left join "+db+".platform_types as p on p.code = i.platform_type_code order by o.obs_type,p.platform_type");
+  query.set("select i.observation_type_code,o.obs_type,i.platform_type_code,p.platform_type from (select distinct observation_type_code,platform_type_code from "+db+".ds"+local_args.dsnum2+"_id_list) as i left join "+db+".obs_types as o on o.code = i.observation_type_code left join "+db+".platform_types as p on p.code = i.platform_type_code order by o.obs_type,p.platform_type");
   if (query.submit(server) < 0) {
     std::cerr << "STATIONVIEWER: error: '" << query.error() << "' for query '" <<
         query.show() << "'" << endl;
@@ -422,7 +422,6 @@ cout << "console.log(u);" << endl;
 }
 
 void get_id_info() {
-  string db = "WObML";
   string option_conditions;
   for (const auto& item : local_args.opList) {
     auto sp = split(item, ",");
@@ -440,15 +439,15 @@ void get_id_info() {
     auto sp2 = split(sp[n], ",");
     MySQL::LocalQuery id_query;
     if (option_conditions.empty()) {
-      id_query.set("select code, sw_lat, sw_lon, ne_lat, ne_lon from " + db +
-          ".ds" + local_args.dsnum2 + "_IDs2 where id_type_code = " + sp2[0] +
-          " and id = '" + sp2[1] + "'");
+      id_query.set("select code, sw_lat, sw_lon, ne_lat, ne_lon from WObML.ds" +
+          local_args.dsnum2 + "_IDs2 where id_type_code = " + sp2[0] + " and "
+          "id = '" + sp2[1] + "'");
     } else {
-      id_query.set("select code, sw_lat, sw_lon, ne_lat, ne_lon from " + db +
-          ".ds" + local_args.dsnum2 + "_IDs2 as i left join " + db + ".ds" +
-          local_args.dsnum2 + "_IDList2 as l on l.id_code = i.code where "
-          "id_type_code = " + sp2[0] + " and id = '" + sp2[1] + "' and (" +
-          option_conditions + ")");
+      id_query.set("select code, sw_lat, sw_lon, ne_lat, ne_lon from WObML.ds" +
+          local_args.dsnum2 + "_IDs2 as i left join WObML.ds" + local_args.
+          dsnum2 + "_id_list as l on l.id_code = i.code where id_type_code = " +
+          sp2[0] + " and id = '" + sp2[1] + "' and (" + option_conditions +
+          ")");
     }
 //std::cerr << id_query.show() << endl;
     if (id_query.submit(server) == 0) {
@@ -473,9 +472,9 @@ void get_id_info() {
         }
       }
       string qselect = "select min(start_date), max(end_date), sum("
-          "num_observations), any_value(t.id_type) from " + db + ".ds" +
-          local_args.dsnum2 + "_IDList2 as l left join " + db + ".id_types as "
-          "t on t.code = " + sp2[0] + " where (" + id_conditions + ")";
+          "num_observations), any_value(t.id_type) from WObML.ds" + local_args.
+          dsnum2 + "_id_list as l left join WObML.id_types as t on t.code = " +
+          sp2[0] + " where (" + id_conditions + ")";
       if (!option_conditions.empty()) {
         qselect += " and (" + option_conditions + ")";
       }
@@ -555,7 +554,7 @@ void get_stations()
         lon_conditions="sw_lon >= "+local_args.wlon+"0000 and ne_lon <= "+local_args.elon+"0000";
       else
         lon_conditions="((sw_lon >= "+local_args.wlon+"0000 and sw_lon <= 1800000) or (sw_lon >= -1800000 and sw_lon <= "+local_args.elon+"0000)) and ((ne_lon >= "+local_args.wlon+"0000 and ne_lon <= 1800000) or (ne_lon >= -1800000 and ne_lon <= "+local_args.elon+"0000))";
-      query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_IDList2 as l left join "+db+".ds"+local_args.dsnum2+"_IDs2 as i on i.code = l.id_code "+whereConditions+" and !isnull(i.id) and sw_lat >= "+local_args.slat+"0000 and ne_lat <= "+local_args.nlat+"0000 and "+lon_conditions+" group by id_type_code,id");
+      query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_id_list as l left join "+db+".ds"+local_args.dsnum2+"_IDs2 as i on i.code = l.id_code "+whereConditions+" and !isnull(i.id) and sw_lat >= "+local_args.slat+"0000 and ne_lat <= "+local_args.nlat+"0000 and "+lon_conditions+" group by id_type_code,id");
   }
   else if (local_args.sstn.length() > 0) {
     if (local_args.spart == "any")
@@ -573,7 +572,7 @@ void get_stations()
         query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_IDs2 where id like '%"+local_args.sstn+"%' group by id_type_code,id");
       }
       else {
-        query.set("select i.id_type_code,i.id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000.,w.id from "+db+".ds"+local_args.dsnum2+"_IDs2 as i left join "+db+".ds"+local_args.dsnum2+"_IDList2 as i2 on i2.id_code = i.code left join "+db+".ds"+local_args.dsnum2+"_webfiles2 as w on w.code = i2.file_code where i.id like '%"+local_args.sstn+"%' group by i.id_type_code,i.id,w.id");
+        query.set("select i.id_type_code,i.id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000.,w.id from "+db+".ds"+local_args.dsnum2+"_IDs2 as i left join "+db+".ds"+local_args.dsnum2+"_id_list as i2 on i2.id_code = i.code left join "+db+".ds"+local_args.dsnum2+"_webfiles2 as w on w.code = i2.file_code where i.id like '%"+local_args.sstn+"%' group by i.id_type_code,i.id,w.id");
       }
     }
     else {
@@ -581,7 +580,7 @@ void get_stations()
         query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_IDs2 where id = '"+local_args.sstn+"' group by id_type_code,id");
       }
       else {
-        query.set("select i.id_type_code,i.id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000.,w.id from "+db+".ds"+local_args.dsnum2+"_IDs2 as i left join "+db+".ds"+local_args.dsnum2+"_IDList2 as i2 on i2.id_code = i.code left join "+db+".ds"+local_args.dsnum2+"_webfiles2 as w on w.code = i2.file_code where i.id = '"+local_args.sstn+"' group by i.id_type_code,i.id,w.id");
+        query.set("select i.id_type_code,i.id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000.,w.id from "+db+".ds"+local_args.dsnum2+"_IDs2 as i left join "+db+".ds"+local_args.dsnum2+"_id_list as i2 on i2.id_code = i.code left join "+db+".ds"+local_args.dsnum2+"_webfiles2 as w on w.code = i2.file_code where i.id = '"+local_args.sstn+"' group by i.id_type_code,i.id,w.id");
       }
     }
   }
@@ -637,10 +636,10 @@ void get_stations()
       lat_conditions="(1)";
     }
     if (local_args.gindex.empty()) {
-      query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_IDList2 as l left join "+db+".ds"+local_args.dsnum2+"_IDs2 as i on i.code = l.id_code"+op_join+" where "+where_conditions+" and !isnull(i.id) and "+lat_conditions+" group by id_type_code,id");
+      query.set("select id_type_code,id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000. from "+db+".ds"+local_args.dsnum2+"_id_list as l left join "+db+".ds"+local_args.dsnum2+"_IDs2 as i on i.code = l.id_code"+op_join+" where "+where_conditions+" and !isnull(i.id) and "+lat_conditions+" group by id_type_code,id");
     }
     else {
-      query.set("select i.id_type_code,i.id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000.,w.id from "+db+".ds"+local_args.dsnum2+"_IDList2 as l left join "+db+".ds"+local_args.dsnum2+"_webfiles2 as w on w.code = l.file_code left join "+db+".ds"+local_args.dsnum2+"_IDs2 as i on i.code = l.id_code"+op_join+" where "+where_conditions+" and !isnull(i.id) and "+lat_conditions+" group by i.id_type_code,i.id,w.id");
+      query.set("select i.id_type_code,i.id,min(sw_lat)/10000.,min(sw_lon)/10000.,max(ne_lat)/10000.,max(ne_lon)/10000.,w.id from "+db+".ds"+local_args.dsnum2+"_id_list as l left join "+db+".ds"+local_args.dsnum2+"_webfiles2 as w on w.code = l.file_code left join "+db+".ds"+local_args.dsnum2+"_IDs2 as i on i.code = l.id_code"+op_join+" where "+where_conditions+" and !isnull(i.id) and "+lat_conditions+" group by i.id_type_code,i.id,w.id");
     }
   }
 //std::cerr << query.show() << endl;
