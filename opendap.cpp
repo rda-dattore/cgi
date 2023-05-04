@@ -208,9 +208,9 @@ void write_reference_times(std::ostream& outs,const ProjectionEntry& pe,int ref_
   if (query.submit(server) == 0 && query.fetch_row(row)) {
     base_dt.set(std::stoll(row[0])*100);
   }
-  std::string query_spec="select distinct ref_time from metautil.custom_dap_grid_index where ID = '"+dap_args.ID+"' and ref_time > 0";
+  std::string query_spec="select distinct ref_time from metautil.custom_dap_grid_index where id = '"+dap_args.ID+"' and ref_time > 0";
   if (pe.key != "ref_time") {
-    query.set("select g.param,g.level_code from (select ID,param,level_code,count(ref_time) as cnt from metautil.custom_dap_grid_index where ID = '"+dap_args.ID+"' group by param,level_code) as g left join metautil.custom_dap_ref_times as t on t.ID = g.ID where t.dim_name = '"+pe.key+"' and g.cnt = t.dim_size");
+    query.set("select g.param,g.level_code from (select id,param,level_code,count(ref_time) as cnt from metautil.custom_dap_grid_index where id = '"+dap_args.ID+"' group by param,level_code) as g left join metautil.custom_dap_ref_times as t on t.ID = g.id where t.dim_name = '"+pe.key+"' and g.cnt = t.dim_size");
     if (query.submit(server) == 0 && query.fetch_row(row)) {
 	query_spec+=" and param = '"+row[0]+"' and level_code = "+row[1];
     }
@@ -240,9 +240,9 @@ void write_reference_times(std::ostream& outs,const ProjectionEntry& pe,int ref_
 void write_times(std::ostream& outs,const ProjectionEntry& pe,int time_index)
 {
   DateTime base_dt(std::stoll(grid_subset_args.startdate)*100);
-  std::string query_spec="select distinct valid_date from metautil.custom_dap_grid_index where ID = '"+dap_args.ID+"'";
+  std::string query_spec="select distinct valid_date from metautil.custom_dap_grid_index where id = '"+dap_args.ID+"'";
   if (pe.key != "time") {
-    MySQL::LocalQuery query("select g.param,g.level_code from (select ID,param,level_code,count(valid_date) as cnt from metautil.custom_dap_grid_index where ID = '"+dap_args.ID+"' group by param,level_code) as g left join metautil.custom_dap_times as t on t.ID = g.ID where t.dim_name = '"+pe.key+"' and g.cnt = t.dim_size");
+    MySQL::LocalQuery query("select g.param,g.level_code from (select id,param,level_code,count(valid_date) as cnt from metautil.custom_dap_grid_index where id = '"+dap_args.ID+"' group by param,level_code) as g left join metautil.custom_dap_times as t on t.ID = g.id where t.dim_name = '"+pe.key+"' and g.cnt = t.dim_size");
     MySQL::Row row;
     if (query.submit(server) == 0 && query.fetch_row(row)) {
 	query_spec+=" and param = '"+row[0]+"' and level_code = "+row[1];
@@ -293,9 +293,9 @@ void write_forecast_hours(std::ostream& outs,const ProjectionEntry& pe,int fcst_
 {
   MySQL::LocalQuery query;
   MySQL::Row row;
-  std::string query_spec="select distinct fcst_hr from metautil.custom_dap_grid_index where ID = '"+dap_args.ID+"' and ref_time > 0";
+  std::string query_spec="select distinct fcst_hr from metautil.custom_dap_grid_index where id = '"+dap_args.ID+"' and ref_time > 0";
   if (pe.key != "fcst_hr") {
-    query.set("select g.param,g.level_code from (select ID,param,level_code,count(distinct fcst_hr) as cnt from metautil.custom_dap_grid_index where ID = '"+dap_args.ID+"' group by param,level_code) as g left join metautil.custom_dap_fcst_hrs as f on f.ID = g.ID where f.dim_name = '"+pe.key+"' and g.cnt = f.dim_size limit 0,1");
+    query.set("select g.param,g.level_code from (select id,param,level_code,count(distinct fcst_hr) as cnt from metautil.custom_dap_grid_index where id = '"+dap_args.ID+"' group by param,level_code) as g left join metautil.custom_dap_fcst_hrs as f on f.ID = g.id where f.dim_name = '"+pe.key+"' and g.cnt = f.dim_size limit 0,1");
     if (query.submit(server) == 0 && query.fetch_row(row)) {
 	query_spec+=" and param = '"+row[0]+"' and level_code = "+row[1];
     }
@@ -650,11 +650,11 @@ std::string fill_parameter_query(std::string param_ID = "")
   if (param_ID.length() == 0) {
     qspec+="x.param,";
   }
-  qspec+="x.tdim_name,x.tdim_size,any_value(l.dim_name),any_value(l.dim_size),x.level_code,any_value(y.tdim_name),any_value(y.tdim_size) from (select any_value(g.ID) as ID,any_value(g.level_code) as level_code,g.param as param,count(g.param) as pcnt,any_value(t.dim_name) as tdim_name,any_value(t.dim_size) as tdim_size from (select ID,dim_name,dim_size,(cast(dim_size as signed)-1) as tsize from metautil.custom_dap_times where ID = '"+dap_args.ID+"') as t left join metautil.custom_dap_grid_index as g on g.ID = t.ID and g.time_slice_index = tsize left join metautil.custom_dap_level_index as l on l.ID = g.ID and l.level_code = g.level_code";
+  qspec+="x.tdim_name,x.tdim_size,any_value(l.dim_name),any_value(l.dim_size),x.level_code,any_value(y.tdim_name),any_value(y.tdim_size) from (select any_value(g.id) as ID,any_value(g.level_code) as level_code,g.param as param,count(g.param) as pcnt,any_value(t.dim_name) as tdim_name,any_value(t.dim_size) as tdim_size from (select ID,dim_name,dim_size,(cast(dim_size as signed)-1) as tsize from metautil.custom_dap_times where ID = '"+dap_args.ID+"') as t left join metautil.custom_dap_grid_index as g on g.id = t.ID and g.time_slice_index = tsize left join metautil.custom_dap_level_index as l on l.ID = g.id and l.level_code = g.level_code";
   if (param_ID.length() > 0) {
     qspec+=" where g.param = '"+param_ID+"'";
   }
-  qspec+=" group by g.param,l.uID) as x left join (select any_value(g.ID) as ID,any_value(g.level_code) as level_code,g.param as param,count(g.param) as pcnt,any_value(t.dim_name) as tdim_name,any_value(t.dim_size) as tdim_size from (select ID,dim_name,dim_size,(cast(dim_size as signed)-1) as tsize from metautil.custom_dap_ref_times where ID = '"+dap_args.ID+"') as t left join metautil.custom_dap_grid_index as g on g.ID = t.ID and g.time_slice_index = tsize left join metautil.custom_dap_level_index as l on l.ID = g.ID and l.level_code = g.level_code where ";
+  qspec+=" group by g.param,l.uID) as x left join (select any_value(g.id) as ID,any_value(g.level_code) as level_code,g.param as param,count(g.param) as pcnt,any_value(t.dim_name) as tdim_name,any_value(t.dim_size) as tdim_size from (select ID,dim_name,dim_size,(cast(dim_size as signed)-1) as tsize from metautil.custom_dap_ref_times where ID = '"+dap_args.ID+"') as t left join metautil.custom_dap_grid_index as g on g.id = t.ID and g.time_slice_index = tsize left join metautil.custom_dap_level_index as l on l.ID = g.id and l.level_code = g.level_code where ";
   if (param_ID.length() > 0) {
     qspec+="g.param = '"+param_ID+"' and ";
   }
@@ -748,14 +748,14 @@ void print_DDS(std::ostream& outs,std::string content_type,std::string content_d
     std::string qspec;
     if (has_ref_times) {
 	if (has_fcst_hrs) {
-	  qspec="(select distinct g.param,r.dim_name,r.dim_size,f.dim_name,f.dim_size from metautil.custom_dap_ref_times as r left join metautil.custom_dap_grid_index as g on g.ID = r.ID and g.time_slice_index = r.max_dim left join metautil.custom_dap_fcst_hrs as f on f.ID = r.ID and concat('ref_time_',f.dim_name) = concat(concat(substr(r.dim_name,1,8),'_fcst_hr'),substr(r.dim_name,9)) where g.ID = '"+dap_args.ID+"' and ref_time > 0 order by g.param)";
+	  qspec="(select distinct g.param,r.dim_name,r.dim_size,f.dim_name,f.dim_size from metautil.custom_dap_ref_times as r left join metautil.custom_dap_grid_index as g on g.id = r.ID and g.time_slice_index = r.max_dim left join metautil.custom_dap_fcst_hrs as f on f.ID = r.ID and concat('ref_time_',f.dim_name) = concat(concat(substr(r.dim_name,1,8),'_fcst_hr'),substr(r.dim_name,9)) where g.id = '"+dap_args.ID+"' and ref_time > 0 order by g.param)";
 	}
 	else {
-	  qspec="(select distinct g.param,r.dim_name,r.dim_size,t.dim_name,t.dim_size from metautil.custom_dap_ref_times as r left join metautil.custom_dap_grid_index as g on g.ID = r.ID and g.time_slice_index = r.max_dim left join metautil.custom_dap_times as t on t.ID = r.ID and concat('ref_',t.dim_name) = r.dim_name where g.ID = '"+dap_args.ID+"' and ref_time > 0 order by g.param)";
+	  qspec="(select distinct g.param,r.dim_name,r.dim_size,t.dim_name,t.dim_size from metautil.custom_dap_ref_times as r left join metautil.custom_dap_grid_index as g on g.id = r.ID and g.time_slice_index = r.max_dim left join metautil.custom_dap_times as t on t.ID = r.ID and concat('ref_',t.dim_name) = r.dim_name where g.id = '"+dap_args.ID+"' and ref_time > 0 order by g.param)";
 	}
 	qspec+="UNION ";
     }
-    qspec+="(select distinct g.param,t.dim_name,t.dim_size,NULL,NULL from metautil.custom_dap_times as t left join metautil.custom_dap_grid_index as g on g.ID = t.ID and g.time_slice_index = t.max_dim where g.ID = '"+dap_args.ID+"' and g.ref_time = 0 order by g.param,t.dim_size desc)";
+    qspec+="(select distinct g.param,t.dim_name,t.dim_size,NULL,NULL from metautil.custom_dap_times as t left join metautil.custom_dap_grid_index as g on g.id = t.ID and g.time_slice_index = t.max_dim where g.id = '"+dap_args.ID+"' and g.ref_time = 0 order by g.param,t.dim_size desc)";
     query.set(qspec);
 //std::cerr << query.show() << std::endl;
     if (query.submit(server) < 0) {
@@ -778,7 +778,7 @@ void print_DDS(std::ostream& outs,std::string content_type,std::string content_d
 	  }
 	  if (has_levels) {
 	    MySQL::LocalQuery query2;
-	    query2.set("select l.dim_name,l.dim_size from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID and l.level_code = g.level_code where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+row[0]+"') as x group by x.uID) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
+	    query2.set("select l.dim_name,l.dim_size from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size from (select distinct g.id as id,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.id and l.level_code = g.level_code where g.id = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+row[0]+"') as x group by x.uID) as y left join metautil.custom_dap_levels as l on l.ID = y.id and l.uID = y.uID and l.dim_size = y.dim_size");
 	    if (query2.submit(server) < 0) {
 		std::cerr << "opendap print_DDS(4a): " << query2.error() << " for " << query2.show() << std::endl;
 		dap_error("500 Internal Server Error","Database error print_DDS(4a)");
@@ -866,10 +866,10 @@ void print_DDS(std::ostream& outs,std::string content_type,std::string content_d
 		DimensionIndex di;
 		if (hasReferenceTimes(server,query)) {
 		  if (hasForecastHours(server,query)) {
-		    query.set("select r.dim_name,r.dim_size,f.dim_name,f.dim_size from metautil.custom_dap_ref_times as r left join metautil.custom_dap_grid_index as g on g.ID = r.ID and g.time_slice_index = r.max_dim left join metautil.custom_dap_fcst_hrs as f on f.ID = r.ID and concat('ref_time_',f.dim_name) = concat(concat(substr(r.dim_name,1,8),'_fcst_hr'),substr(r.dim_name,9)) where g.ID = '"+dap_args.ID+"' and g.param = '"+key+"'");
+		    query.set("select r.dim_name,r.dim_size,f.dim_name,f.dim_size from metautil.custom_dap_ref_times as r left join metautil.custom_dap_grid_index as g on g.id = r.ID and g.time_slice_index = r.max_dim left join metautil.custom_dap_fcst_hrs as f on f.ID = r.ID and concat('ref_time_',f.dim_name) = concat(concat(substr(r.dim_name,1,8),'_fcst_hr'),substr(r.dim_name,9)) where g.id = '"+dap_args.ID+"' and g.param = '"+key+"'");
 		  }
 		  else {
-		    query.set("select r.dim_name,r.dim_size,t.dim_name,t.dim_size from metautil.custom_dap_ref_times as r left join metautil.custom_dap_grid_index as g on g.ID = r.ID and g.time_slice_index = r.max_dim left join metautil.custom_dap_times as t on t.ID = r.ID and concat('ref_',t.dim_name) = r.dim_name where g.ID = '"+dap_args.ID+"' and g.param = '"+key+"'");
+		    query.set("select r.dim_name,r.dim_size,t.dim_name,t.dim_size from metautil.custom_dap_ref_times as r left join metautil.custom_dap_grid_index as g on g.id = r.ID and g.time_slice_index = r.max_dim left join metautil.custom_dap_times as t on t.ID = r.ID and concat('ref_',t.dim_name) = r.dim_name where g.id = '"+dap_args.ID+"' and g.param = '"+key+"'");
 		  }
 		  if (query.submit(server) == 0 && query.fetch_row(row)) {
 		    di.length=std::stoi(row[1]);
@@ -885,7 +885,7 @@ void print_DDS(std::ostream& outs,std::string content_type,std::string content_d
 		  }
 		}
 		else {
-		  query.set("select t.dim_name,t.dim_size from metautil.custom_dap_times as t left join metautil.custom_dap_grid_index as g on g.ID = t.ID and g.time_slice_index = t.max_dim where g.ID = '"+dap_args.ID+"' and g.param = '"+key+"'");
+		  query.set("select t.dim_name,t.dim_size from metautil.custom_dap_times as t left join metautil.custom_dap_grid_index as g on g.id = t.ID and g.time_slice_index = t.max_dim where g.id = '"+dap_args.ID+"' and g.param = '"+key+"'");
 		  if (query.submit(server) == 0 && query.fetch_row(row)) {
 		    di.length=std::stoi(row[1]);
 		    di.start=0;
@@ -895,7 +895,7 @@ void print_DDS(std::ostream& outs,std::string content_type,std::string content_d
 		  }
 		}
 		if (hasLevels(server,query)) {
-		  query.set("select l.dim_name,l.dim_size from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID and l.level_code = g.level_code where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+key+"') as x group by x.uID) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
+		  query.set("select l.dim_name,l.dim_size from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size from (select distinct g.id as id,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.id and l.level_code = g.level_code where g.id = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+key+"') as x group by x.uID) as y left join metautil.custom_dap_levels as l on l.ID = y.id and l.uID = y.uID and l.dim_size = y.dim_size");
 		  if (query.submit(server) == 0 && query.fetch_row(row)) {
 		    di.length=std::stoi(row[1]);
 		    di.start=0;
@@ -1301,7 +1301,7 @@ void print_parameter_attributes(std::string format,std::string param_ID,std::str
 	std::cout << "    String long_name \"" << description << "\";" << std::endl;
 	std::cout << "    String units \"" << units << "\";" << std::endl;
 	if (format == "WMO_GRIB1" || format == "WMO_GRIB2") {
-	  std::cout << "    Float32 _FillValue " << Grid::missing_value << ";" << std::endl;
+	  std::cout << "    Float32 _FillValue " << Grid::MISSING_VALUE << ";" << std::endl;
 	}
 	if (grid_subset_args.inittime.length() > 0) {
 	  std::cout << "    String model_initialization_time \"" << grid_subset_args.inittime << " UTC\";" << std::endl;
@@ -1316,7 +1316,7 @@ void print_parameter_attributes(std::string format,std::string param_ID,std::str
 	std::cout << "<strong>long_name:</strong>&nbsp;" << description << "<br />";
 	std::cout << "<strong>units:</strong>&nbsp;" << units << "<br />";
 	if (format == "WMO_GRIB1" || format == "WMO_GRIB2") {
-	  std::cout << "<strong>_FillValue:</strong>&nbsp;" << Grid::missing_value << "<br />";
+	  std::cout << "<strong>_FillValue:</strong>&nbsp;" << Grid::MISSING_VALUE << "<br />";
 	}
 	if (grid_subset_args.inittime.length() > 0) {
 	  std::cout << "<strong>model_initialization_time:</strong>&nbsp;" << grid_subset_args.inittime << "<br />";
@@ -1347,7 +1347,7 @@ void print_parameter_attributes(std::string format,std::string param_ID,std::str
 	    std::cout << "<tr valign=\"top\"><td></td><td></td><td align=\"left\"><strong>long_name:</strong>&nbsp;" << description << "</td></tr>";
 	    std::cout << "<tr valign=\"top\"><td></td><td></td><td align=\"left\"><strong>units:</strong>&nbsp;" << units << "</td></tr>";
 	    if (format == "WMO_GRIB1" || format == "WMO_GRIB2") {
-		std::cout << "<tr valign=\"top\"><td></td><td></td><td align=\"left\"><strong>_FillValue:</strong>&nbsp;" << Grid::missing_value << "</td></tr>";
+		std::cout << "<tr valign=\"top\"><td></td><td></td><td align=\"left\"><strong>_FillValue:</strong>&nbsp;" << Grid::MISSING_VALUE << "</td></tr>";
 	    }
 	    if (grid_subset_args.inittime.length() > 0) {
 		std::cout << "<tr valign=\"top\"><td></td><td></td><td align=\"left\"><strong>model_initialization_time:</strong>&nbsp;" << grid_subset_args.inittime << "</td></tr>";
@@ -1407,7 +1407,7 @@ void print_parameters(std::string& format,xmlutils::LevelMapper& level_mapper)
     }
   }
   format=pe.data->format;
-  query.set("select distinct param from metautil.custom_dap_grid_index where ID = '"+dap_args.ID+"' and time_slice_index = 0");
+  query.set("select distinct param from metautil.custom_dap_grid_index where id = '"+dap_args.ID+"' and time_slice_index = 0");
   if (query.submit(server) < 0) {
     std::cerr << "opendap print_DAS(1): " << query.error() << " for " << query.show() << std::endl;
     dap_error("500 Internal Server Error","Database error print_DAS(1)");
@@ -1415,7 +1415,7 @@ void print_parameters(std::string& format,xmlutils::LevelMapper& level_mapper)
   while (query.fetch_row(row)) {
     parameter_table.found(row[0].substr(0,row[0].rfind("_")),pe);
     MySQL::LocalQuery query2;
-    query2.set("select l.level_key,y.level_codes from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size,group_concat(x.level_code separator '!') as level_codes from (select distinct g.ID as ID,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.ID and l.level_code = g.level_code where g.ID = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+row[0]+"') as x group by x.uID) as y left join metautil.custom_dap_levels as l on l.ID = y.ID and l.uID = y.uID and l.dim_size = y.dim_size");
+    query2.set("select l.level_key,y.level_codes from (select any_value(x.ID) as ID,any_value(x.uID) as uID,count(x.uID) as dim_size,group_concat(x.level_code separator '!') as level_codes from (select distinct g.id as id,g.level_code,l.uID as uID from metautil.custom_dap_grid_index as g left join metautil.custom_dap_level_index as l on l.ID = g.id and l.level_code = g.level_code where g.id = '"+dap_args.ID+"' and g.time_slice_index < 100 and g.param = '"+row[0]+"') as x group by x.uID) as y left join metautil.custom_dap_levels as l on l.ID = y.id and l.uID = y.uID and l.dim_size = y.dim_size");
     if (query2.submit(server) < 0) {
 	std::cerr << "opendap print_DAS(1a): " << query2.error() << " for " << query2.show() << std::endl;
 	dap_error("500 Internal Server Error","Database error print_DAS(1a)");
@@ -1425,7 +1425,7 @@ void print_parameters(std::string& format,xmlutils::LevelMapper& level_mapper)
 	if (row2[0].length() == 0) {
 	  MySQL::LocalQuery query3;
 	  MySQL::Row row3;
-	  query3.set("select distinct l.type,l.map,l.value,f.format from metautil.custom_dap_grid_index as g left join WGrML.levels as l on l.code = g.level_code left join WGrML.ds"+dap_args.dsnum2+"_webfiles2 as w on w.code = g.webID_code left join WGrML.formats as f on f.code = w.format_code where g.param = '"+row[0]+"' and g.ID = '"+dap_args.ID+"' and g.time_slice_index = 0");
+	  query3.set("select distinct l.type,l.map,l.value,f.format from metautil.custom_dap_grid_index as g left join WGrML.levels as l on l.code = g.level_code left join WGrML.ds"+dap_args.dsnum2+"_webfiles2 as w on w.code = g.file_code left join WGrML.formats as f on f.code = w.format_code where g.param = '"+row[0]+"' and g.id = '"+dap_args.ID+"' and g.time_slice_index = 0");
 	  if (query3.submit(server) < 0) {
 	    std::cerr << "opendap print_DAS(1b): " << query2.error() << " for " << query2.show() << std::endl;
 	    dap_error("500 Internal Server Error","Database error print_DAS(1b)");
@@ -1645,14 +1645,14 @@ std::cerr << "but it did happen (2)" << std::endl;
   else {
     query_spec << " metautil.custom_dap_grid_index as g";
   }
-  query_spec << " left join metautil.custom_dap_level_index as l on l.ID = g.ID and l.level_code = g.level_code left join IGrML.`ds" << dap_args.dsnum2 << "_inventory_";
+  query_spec << " left join metautil.custom_dap_level_index as l on l.ID = g.id and l.level_code = g.level_code left join IGrML.`ds" << dap_args.dsnum2 << "_inventory_";
   if (pdata.data->format_codes.size() < 2 && pdata.data->codes.size() < 2) {
     query_spec << pdata.data->format_codes.front() << "!" << pdata.data->codes.front();
   }
   else {
     query_spec << "<FCODE>!<PCODE>";
   }
-  query_spec << "` as i on i.valid_date = g.valid_date and i.webID_code = g.webID_code and i.timeRange_code = g.timeRange_code and i.level_code = g.level_code left join WGrML.ds" << dap_args.dsnum2 << "_webfiles2 as w on w.code = i.webID_code left join WGrML.formats as f on f.code = w.format_code where g.ID = '" << dap_args.ID << "' and g.param = '" << pe.key << "'";
+  query_spec << "` as i on i.valid_date = g.valid_date and i.webID_code = g.webID_code and i.timeRange_code = g.time_range_code and i.level_code = g.level_code left join WGrML.ds" << dap_args.dsnum2 << "_webfiles2 as w on w.code = i.webID_code left join WGrML.formats as f on f.code = w.format_code where g.id = '" << dap_args.ID << "' and g.param = '" << pe.key << "'";
   std::string order_by;
   if (pe.data->ref_time_dim.name.length() > 0) {
     if (pe.data->idx[0].start == pe.data->idx[0].stop) {
@@ -1861,7 +1861,7 @@ std::cerr << "but it did happen (2)" << std::endl;
 		    if (mbuffer == nullptr) {
 			mbuffer=new char[grid_size*4];
 			for (size_t n=0; n < grid_size; ++n) {
-			  fpoints[n]=Grid::missing_value;
+			  fpoints[n]=Grid::MISSING_VALUE;
 			}
 			bits::set(mbuffer,reinterpret_cast<int *>(fpoints),0,32,0,grid_size);
 		    }
@@ -1913,7 +1913,7 @@ std::cerr << "but it did happen (2)" << std::endl;
     }
     else {
 	auto mbuffer=new char[4];
-	float f[]={static_cast<float>(Grid::missing_value)};
+	float f[]={static_cast<float>(Grid::MISSING_VALUE)};
 	bits::set(mbuffer,reinterpret_cast<int *>(f),0,32,0,1);
 	for (size_t n=0; n < grid_size; ++n) {
 	  std::cout.write(mbuffer,4);
@@ -2097,7 +2097,7 @@ int main(int argc,char **argv)
 	  }
 	}
 	if (!projection_table.found(pe.key,pe)) {
-	  query.set("select distinct r.dim_name,r.dim_size,t.dim_name,t.dim_size,f.dim_name,f.dim_size from metautil.custom_dap_ref_times as r left join metautil.custom_dap_grid_index as g on g.ID = r.ID and g.time_slice_index = r.max_dim left join metautil.custom_dap_times as t on t.ID = r.ID and concat('ref_',t.dim_name) = r.dim_name left join metautil.custom_dap_fcst_hrs as f on f.ID = r.ID and concat(concat(substr(r.dim_name,1,8),'_fcst_hr'),substr(r.dim_name,9)) = concat('ref_time_',f.dim_name) where g.ID = '"+dap_args.ID+"' and g.param = '"+pe.key+"' and g.ref_time > 0");
+	  query.set("select distinct r.dim_name,r.dim_size,t.dim_name,t.dim_size,f.dim_name,f.dim_size from metautil.custom_dap_ref_times as r left join metautil.custom_dap_grid_index as g on g.id = r.ID and g.time_slice_index = r.max_dim left join metautil.custom_dap_times as t on t.ID = r.ID and concat('ref_',t.dim_name) = r.dim_name left join metautil.custom_dap_fcst_hrs as f on f.ID = r.ID and concat(concat(substr(r.dim_name,1,8),'_fcst_hr'),substr(r.dim_name,9)) = concat('ref_time_',f.dim_name) where g.id = '"+dap_args.ID+"' and g.param = '"+pe.key+"' and g.ref_time > 0");
 	  if (query.submit(server) == 0) {
 	    if (query.num_rows() > 0) {
 		if (query.fetch_row(row)) {
@@ -2114,7 +2114,7 @@ int main(int argc,char **argv)
 		}
 	    }
 	    else {
-		query.set("select distinct t.dim_name,t.dim_size from metautil.custom_dap_times as t left join metautil.custom_dap_grid_index as g on g.ID = t.ID and g.time_slice_index = t.max_dim where g.ID = '"+dap_args.ID+"' and g.param = '"+pe.key+"' and g.ref_time = 0 order by t.dim_size desc");
+		query.set("select distinct t.dim_name,t.dim_size from metautil.custom_dap_times as t left join metautil.custom_dap_grid_index as g on g.id = t.ID and g.time_slice_index = t.max_dim where g.id = '"+dap_args.ID+"' and g.param = '"+pe.key+"' and g.ref_time = 0 order by t.dim_size desc");
 		if (query.submit(server) == 0 && query.fetch_row(row)) {
 		  pe.data->time_dim.name=row[0];
 		  pe.data->time_dim.size=row[1];
@@ -2124,7 +2124,7 @@ int main(int argc,char **argv)
 	  query.set("select dim_name,dim_size from metautil.custom_dap_level_list where ID = '"+dap_args.ID+"' and param = '"+pe.key+"'");
 	  if (query.submit(server) == 0) {
 	    if (query.num_rows() == 0) {
-		query.set("select count(distinct g.level_code) as lcnt,any_value(l.dim_name),any_value(l.dim_size) as dsize from metautil.custom_dap_grid_index as g left join metautil.custom_dap_levels as l on l.ID = g.ID where g.ID = '"+dap_args.ID+"' and g.param = '"+pe.key+"' having lcnt = dsize");
+		query.set("select count(distinct g.level_code) as lcnt,any_value(l.dim_name),any_value(l.dim_size) as dsize from metautil.custom_dap_grid_index as g left join metautil.custom_dap_levels as l on l.ID = g.id where g.id = '"+dap_args.ID+"' and g.param = '"+pe.key+"' having lcnt = dsize");
 		if (query.submit(server) == 0 && query.fetch_row(row)) {
 		  server.insert("metautil.custom_dap_level_list","'"+dap_args.ID+"','"+pe.key+"','"+row[1]+"',"+row[2]);
 		  pe.data->level_dim.name=row[1];
