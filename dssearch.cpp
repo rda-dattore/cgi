@@ -721,10 +721,10 @@ void search()
   wle.weight=2.;
   list_of_word_lists.emplace_back(wle);
 //  wle.wordList="search.projects";
-wle.wordList="(select p.dsid as dsid, g.path as keyword from search.projects_new as p left join search.GCMD_projects as g on g.uuid = p.keyword) as x";
+wle.wordList="(select p.dsid as dsid, g.path as keyword from search.projects_new as p left join search.gcmd_projects as g on g.uuid = p.keyword) as x";
   wle.weight=5.;
   list_of_word_lists.emplace_back(wle);
-  wle.wordList="search.supportedProjects";
+  wle.wordList="search.supported_projects";
   wle.weight=5.;
   list_of_word_lists.emplace_back(wle);
   wle.wordList="search.formats";
