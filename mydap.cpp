@@ -22,7 +22,7 @@ const string DUSER = duser();
 bool g_from_dashboard;
 
 void showAggregations(MySQL::Server& server) {
-  MySQL::LocalQuery query("select d.ID, d.rinfo, d.date, s.title from metautil."
+  MySQL::LocalQuery query("select d.id, d.rinfo, d.date, s.title from metautil."
       "custom_dap as d left join search.datasets as s on s.dsid = substr(d."
       "rinfo, locate('dsnum=', d.rinfo)+6, 5) where duser = '" + DUSER +
       "' order by d.date");
@@ -292,31 +292,31 @@ int main(int argc, char **argv) {
   QueryString queryString(QueryString::POST);
   if (queryString) {
     auto action = queryString.value("action");
-    auto ID = queryString.value("id");
+    auto id = queryString.value("id");
     cout << "Content-type: text/html" << endl << endl;
     if (action == "delete") {
-      if (server._delete("metautil.custom_dap_times", "ID = '" + ID + "'") <
+      if (server._delete("metautil.custom_dap_times", "id = '" + id + "'") <
           0) {
         cout << "Error" << endl;
         exit(0);
       }
-      server._delete("metautil.custom_dap_time_index", "ID = '" + ID + "'");
-      if (server._delete("metautil.custom_dap_levels", "ID = '" + ID + "'") <
+      server._delete("metautil.custom_dap_time_index", "id = '" + id + "'");
+      if (server._delete("metautil.custom_dap_levels", "id = '" + id + "'") <
           0) {
         cout << "Error" << endl;
         exit(0);
       }
-      if (server._delete("metautil.custom_dap_level_index", "ID = '" + ID + "'")
+      if (server._delete("metautil.custom_dap_level_index", "id = '" + id + "'")
           < 0) {
         cout << "Error" << endl;
         exit(0);
       }
-      if (server._delete("metautil.custom_dap_grid_index", "id = '" + ID + "'")
+      if (server._delete("metautil.custom_dap_grid_index", "id = '" + id + "'")
           < 0) {
         cout << "Error" << endl;
         exit(0);
       }
-      if (server._delete("metautil.custom_dap", "ID = '" + ID + "'") < 0) {
+      if (server._delete("metautil.custom_dap", "id = '" + id + "'") < 0) {
         cout << "Error" << endl;
         exit(0);
       }
@@ -326,7 +326,7 @@ int main(int argc, char **argv) {
       MySQL::Server server("rda-db.ucar.edu", "metadata", "metadata", "");
       if (server && server.update("metautil.custom_dap", "date = '" + DateTime(
           stoll(exp) * 1000000).days_subtracted(14).to_string("%Y-%m-%d") + "'",
-          "ID = '" + ID + "'") == 0) {
+          "id = '" + id + "'") == 0) {
         cout << "<h1>Success</h1><p>The expiration date for your aggregation "
             "has been successfully extended.</p>" << endl;
       } else {
