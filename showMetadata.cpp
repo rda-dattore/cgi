@@ -4,60 +4,104 @@
 #include <metadata_export.hpp>
 #include <metadata.hpp>
 #include <web/web.hpp>
-#include <hereDoc.hpp>
 #include <tokendoc.hpp>
+#include <MySQL.hpp>
 #include <myerror.hpp>
+
+using std::cout;
+using std::endl;
+using std::string;
+using std::stringstream;
+using std::unique_ptr;
+using strutils::replace_all;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
-std::string myerror="";
-std::string mywarning="";
+string myerror = "";
+string mywarning = "";
 
-struct ME_Args {
-  ME_Args() : action("ListFormats"),format() {}
+struct LocalArgs {
+  LocalArgs() : action("ListFormats"), format() { }
 
-  std::string action,format;
-} me_args;
+  string action, format;
+} local_args;
 
-void parseQuery()
-{
+void parseQuery() {
   QueryString query_string(QueryString::GET);
-  auto sdum=query_string.value("action");
-  if (!sdum.empty()) {
-    me_args.action=sdum;
+  auto v = query_string.value("action");
+  if (!v.empty()) {
+    local_args.action = v;
   }
-  metautils::args.dsnum=query_string.value("dsnum");
-  me_args.format=query_string.value("format");
+  metautils::args.dsnum = query_string.value("dsnum");
+  local_args.format = query_string.value("format");
 }
 
-void list_formats()
-{
-  std::cout << "Content-type: text/html" << std::endl << std::endl;
-  hereDoc::Tokens tokens;
-  tokens.replaces.emplace_back("__DSNUM__<!>"+metautils::args.dsnum);
-  hereDoc::print("/usr/local/www/server_root/web/html/oai/showMetadata-format-menu.html",&tokens);
+void list_formats() {
+  cout << "Content-type: text/html" << endl << endl;
+  TokenDocument tdoc("/usr/local/www/server_root/web/html/oai/showMetadata-"
+      "format-menu.html");
+  tdoc.add_replacement("__DSNUM__", metautils::args.dsnum);
+  MySQL::Server server(metautils::directives.database_server, metautils::
+      directives.metadb_username, metautils::directives.metadb_password, "");
+  MySQL::LocalQuery q("doi", "dssdb.dsvrsn", "dsid = 'ds" + metautils::args.
+      dsnum + "' and status = 'A'");
+  MySQL::Row row;
+  if (q.submit(server) == 0 && q.fetch_row(row)) {
+    tdoc.add_repeat("__FORMAT_OPTIONS__", TokenDocument::REPEAT_PAIRS{
+        { "IDENTIFIER", "datacite4" },
+        { "DESCRIPTION", "DataCite v4" }
+    });
+    tdoc.add_repeat("__FORMAT_OPTIONS__", TokenDocument::REPEAT_PAIRS{
+        { "IDENTIFIER", "datacite" },
+        { "DESCRIPTION", "DataCite v3" }
+    });
+  }
+  server.disconnect();
+  tdoc.add_repeat("__FORMAT_OPTIONS__", TokenDocument::REPEAT_PAIRS{
+      { "IDENTIFIER", "dif" },
+      { "DESCRIPTION", "GCMD Directory Interchange Format (DIF)" }
+  });
+  tdoc.add_repeat("__FORMAT_OPTIONS__", TokenDocument::REPEAT_PAIRS{
+      { "IDENTIFIER", "oai_dc" },
+      { "DESCRIPTION", "Dublin Core (DC)" }
+  });
+  tdoc.add_repeat("__FORMAT_OPTIONS__", TokenDocument::REPEAT_PAIRS{
+      { "IDENTIFIER", "fgdc" },
+      { "DESCRIPTION", "Federal Geographic Data Committee (FGDC)" }
+  });
+  tdoc.add_repeat("__FORMAT_OPTIONS__", TokenDocument::REPEAT_PAIRS{
+      { "IDENTIFIER", "iso19139" },
+      { "DESCRIPTION", "International Organization for Standardization (ISO) 19139" }
+  });
+  tdoc.add_repeat("__FORMAT_OPTIONS__", TokenDocument::REPEAT_PAIRS{
+      { "IDENTIFIER", "iso19115-3" },
+      { "DESCRIPTION", "International Organization for Standardization (ISO) 19115-3" }
+  });
+  tdoc.add_repeat("__FORMAT_OPTIONS__", TokenDocument::REPEAT_PAIRS{
+      { "IDENTIFIER", "json-ld" },
+      { "DESCRIPTION", "JSON-LD Structured Data" }
+  });
+  cout << tdoc << endl;
 }
 
-void get_content()
-{
-  metautils::read_config("showMetadata","",false);
-  std::stringstream xmlss;
-  std::unique_ptr<TokenDocument> token_doc;
-  metadataExport::export_metadata(me_args.format,token_doc,xmlss,metautils::args.dsnum);
-  auto xs=xmlss.str();
-  strutils::replace_all(xs,"<","&lt;");
-  strutils::replace_all(xs,">","&gt;");
-  std::cout << "Content-type: text/plain" << std::endl << std::endl;
-  std::cout << xs << std::endl;
+void get_content() {
+  stringstream xmlss;
+  unique_ptr<TokenDocument> token_doc;
+  metadataExport::export_metadata(local_args.format, token_doc, xmlss,
+      metautils::args.dsnum);
+  auto xs = xmlss.str();
+  replace_all(xs, "<", "&lt;");
+  replace_all(xs, ">", "&gt;");
+  cout << "Content-type: text/plain" << endl << endl;
+  cout << xs << endl;
 }
 
-int main(int argc,char **argv)
-{
+int main(int argc, char **argv) {
+  metautils::read_config("showMetadata", "", false);
   parseQuery();
-  if (me_args.action == "ListFormats") {
+  if (local_args.action == "ListFormats") {
     list_formats();
-  }
-  else if (me_args.action == "GetContent") {
+  } else if (local_args.action == "GetContent") {
     get_content();
   }
 }
