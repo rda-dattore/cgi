@@ -1,13 +1,14 @@
 #include <iostream>
 #include <sstream>
 #include <strutils.hpp>
-#include <metadata_export.hpp>
+#include <metadata_export_pg.hpp>
 #include <metadata.hpp>
 #include <web/web.hpp>
 #include <tokendoc.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <myerror.hpp>
 
+using namespace PostgreSQL;
 using std::cout;
 using std::endl;
 using std::string;
@@ -41,11 +42,11 @@ void list_formats() {
   TokenDocument tdoc("/usr/local/www/server_root/web/html/oai/showMetadata-"
       "format-menu.html");
   tdoc.add_replacement("__DSNUM__", metautils::args.dsnum);
-  MySQL::Server server(metautils::directives.database_server, metautils::
-      directives.metadb_username, metautils::directives.metadb_password, "");
-  MySQL::LocalQuery q("doi", "dssdb.dsvrsn", "dsid = 'ds" + metautils::args.
-      dsnum + "' and status = 'A'");
-  MySQL::Row row;
+  Server server(metautils::directives.database_server, metautils::directives.
+      metadb_username, metautils::directives.metadb_password, "rdadb");
+  LocalQuery q("doi", "dssdb.dsvrsn", "dsid = 'ds" + metautils::args.dsnum +
+      "' and status = 'A'");
+  Row row;
   if (q.submit(server) == 0 && q.fetch_row(row)) {
     tdoc.add_repeat("__FORMAT_OPTIONS__", TokenDocument::REPEAT_PAIRS{
         { "IDENTIFIER", "datacite4" },
