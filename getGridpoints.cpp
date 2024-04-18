@@ -1,13 +1,14 @@
 #include <iostream>
 #include <regex>
 #include <web/web.hpp>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <grid.hpp>
 #include <gridutils.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <mymap.hpp>
 
+using namespace PostgreSQL;
 using gridutils::fill_gaussian_latitudes;
 using gridutils::fill_lat_lons_from_lambert_conformal_gridpoints;
 using gridutils::fix_grid_definition;
@@ -48,14 +49,14 @@ int main(int argc, char **argv) {
     slat = stof(queryString.value("lat"));
     nlat = slat;
   }
-  MySQL::Server server("rda-db.ucar.edu", "metadata", "metadata", "");
+  Server server("rda-db.ucar.edu", "metadata", "metadata", "rdadb");
   if (!server) {
     web_error("Unable to connect to database.");
   }
-  MySQL::Query query;
+  Query query;
   query.set("definition, def_params", db + ".grid_definitions", "code = " +
       code);
-  MySQL::Row row;
+  Row row;
   if (query.submit(server) < 0 || !query.fetch_row(row)) {
     web_error("Database error.");
   }
