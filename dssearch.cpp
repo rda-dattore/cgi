@@ -517,9 +517,11 @@ void show_results() {
           return true;
         }
         return false;
-      } else {
-        return (left.rating > right.rating);
       }
+      if (left.rating == right.rating) {
+        return (left.dsid < right.dsid);
+      }
+      return (left.rating > right.rating);
     });
     std::ofstream log;
     if (add_to_log) {
