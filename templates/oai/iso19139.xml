@@ -510,9 +510,6 @@
           </gmd:otherConstraints>
 #ENDIF __HAS_ACCESS_RESTRICTIONS__
 #ELSE __HAS_ACCESS_RESTRICTIONS__
-          <gmd:otherConstraints>
-            <gco:CharacterString>Registration on the RDA web site is a requirement for access to the data.</gco:CharacterString>
-          </gmd:otherConstraints>
 #ENDELSE __HAS_ACCESS_RESTRICTIONS__
         </gmd:MD_LegalConstraints>
       </gmd:resourceConstraints>
@@ -720,7 +717,7 @@
           <gmd:onLine>
             <gmd:CI_OnlineResource>
               <gmd:linkage>
-                <gmd:URL>https://rda.ucar.edu/datasets/__DSID__/#!access</gmd:URL>
+                <gmd:URL>https://rda.ucar.edu/datasets/__DSID__/dataaccess/</gmd:URL>
               </gmd:linkage>
               <gmd:protocol>
                 <gco:CharacterString>https</gco:CharacterString>
