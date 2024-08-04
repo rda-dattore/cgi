@@ -86,13 +86,17 @@
     <gco:CharacterString>ISO19115:2003/Cor 1 2006</gco:CharacterString>
   </gmd:metadataStandardVersion>
   <gmd:dataSetURI>
+@
 #IF __HAS_DOI__
     <gco:CharacterString>https://doi.org/__DOI__</gco:CharacterString>
 #ENDIF __HAS_DOI__
+@
 #ELSE __HAS_DOI__
     <gco:CharacterString>https://rda.ucar.edu/datasets/__DSID__/</gco:CharacterString>
 #ENDELSE __HAS_DOI__
+@
   </gmd:dataSetURI>
+@
 #REPEAT __RELATED_RESOURCE__
   <gmd:metadataExtensionInfo>
     <gmd:MD_MetadataExtensionInformation>
@@ -118,6 +122,7 @@
     </gmd:MD_MetadataExtensionInformation>
   </gmd:metadataExtensionInfo>
 #ENDREPEAT __RELATED_RESOURCE__
+@
   <gmd:identificationInfo>
     <gmd:MD_DataIdentification>
       <gmd:citation>
@@ -136,6 +141,7 @@
               </gmd:dateType>
             </gmd:CI_Date>
           </gmd:date>
+@
 #IF __HAS_AUTHOR_PERSONS__
 #REPEAT __AUTHOR_PERSON__
           <gmd:citedResponsibleParty>
@@ -150,6 +156,7 @@
           </gmd:citedResponsibleParty>
 #ENDREPEAT __AUTHOR_PERSON__
 #ENDIF __HAS_AUTHOR_PERSONS__
+@
 #IF __HAS_AUTHOR_ORGS__
 #REPEAT __AUTHOR_ORG__
           <gmd:citedResponsibleParty>
@@ -164,6 +171,7 @@
           </gmd:citedResponsibleParty>
 #ENDREPEAT __AUTHOR_ORG__
 #ENDIF __HAS_AUTHOR_ORGS__
+@
           <gmd:citedResponsibleParty>
             <gmd:CI_ResponsibleParty>
               <gmd:organisationName><gco:CharacterString>Research Data Archive at the National Center for Atmospheric Research, Computational and Information Systems Laboratory</gco:CharacterString></gmd:organisationName>
@@ -245,6 +253,7 @@
           </gmd:updateScope>
         </gmd:MD_MaintenanceInformation>
       </gmd:resourceMaintenance>
+@
 #IF __HAS_LOGO__
       <gmd:graphicOverview>
         <gmd:MD_BrowseGraphic>
@@ -254,6 +263,7 @@
         </gmd:MD_BrowseGraphic>
       </gmd:graphicOverview>
 #ENDIF __HAS_LOGO__
+@
 #IF __HAS_FORMATS__
 #REPEAT __FORMAT__
       <gmd:resourceFormat>
@@ -266,6 +276,7 @@
       </gmd:resourceFormat>
 #ENDREPEAT __FORMAT__
 #ENDIF __HAS_FORMATS__
+@
       <gmd:descriptiveKeywords>
         <gmd:MD_Keywords>
           <gmd:keyword>
@@ -306,14 +317,17 @@
           </gmd:thesaurusName>
         </gmd:MD_Keywords>
       </gmd:descriptiveKeywords>
+@
 #IF __HAS_PLATFORMS__
       <gmd:descriptiveKeywords>
         <gmd:MD_Keywords>
+@
 #REPEAT __PLATFORM__
           <gmd:keyword>
             <gco:CharacterString>__PLATFORM__</gco:CharacterString>
           </gmd:keyword>
 #ENDREPEAT __PLATFORM__
+@
           <gmd:thesaurusName>
             <gmd:CI_Citation>
               <gmd:title>
@@ -353,14 +367,17 @@
         </gmd:MD_Keywords>
       </gmd:descriptiveKeywords>
 #ENDIF __HAS_PLATFORMS__
+@
 #IF __HAS_INSTRUMENTS__
       <gmd:descriptiveKeywords>
         <gmd:MD_Keywords>
+@
 #REPEAT __INSTRUMENT__
           <gmd:keyword>
             <gco:CharacterString>__INSTRUMENT__</gco:CharacterString>
           </gmd:keyword>
 #ENDREPEAT __INSTRUMENT__
+@
           <gmd:thesaurusName>
             <gmd:CI_Citation>
               <gmd:title>
@@ -400,14 +417,17 @@
         </gmd:MD_Keywords>
       </gmd:descriptiveKeywords>
 #ENDIF __HAS_INSTRUMENTS__
+@
 #IF __HAS_PROJECTS__
       <gmd:descriptiveKeywords>
         <gmd:MD_Keywords>
+@
 #REPEAT __PROJECT__
           <gmd:keyword>
             <gco:CharacterString>__PROJECT__</gco:CharacterString>
           </gmd:keyword>
 #ENDREPEAT __PROJECT__
+@
           <gmd:thesaurusName>
             <gmd:CI_Citation>
               <gmd:title>
@@ -447,13 +467,16 @@
         </gmd:MD_Keywords>
       </gmd:descriptiveKeywords>
 #ENDIF __HAS_PROJECTS__
+@
       <gmd:descriptiveKeywords>
         <gmd:MD_Keywords>
+@
 #REPEAT __SCIENCEKEYWORD__
           <gmd:keyword>
             <gco:CharacterString>__SCIENCEKEYWORD__</gco:CharacterString>
           </gmd:keyword>
 #ENDREPEAT __SCIENCEKEYWORD__
+@
           <gmd:thesaurusName>
             <gmd:CI_Citation>
               <gmd:title>
@@ -494,30 +517,28 @@
       </gmd:descriptiveKeywords>
       <gmd:resourceConstraints>
         <gmd:MD_LegalConstraints>
-#IF __HAS_USAGE_RESTRICTIONS__
           <gmd:useLimitation>
             <gco:CharacterString>__USAGE_RESTRICTIONS__</gco:CharacterString>
           </gmd:useLimitation>
-#ENDIF __HAS_USAGE_RESTRICTIONS__
-#ELSE __HAS_USAGE_RESTRICTIONS__
-          <gmd:useLimitation>
-            <gco:CharacterString>Use of this dataset is subject to UCAR's Terms of Use, except that commercial use is generally not prohibited.</gco:CharacterString>
-          </gmd:useLimitation>
-#ENDELSE __HAS_USAGE_RESTRICTIONS__
-#IF __HAS_ACCESS_RESTRICTIONS__
           <gmd:otherConstraints>
+#IF __HAS_ACCESS_RESTRICTIONS__
             <gco:CharacterString>__ACCESS_RESTRICTIONS__</gco:CharacterString>
-          </gmd:otherConstraints>
 #ENDIF __HAS_ACCESS_RESTRICTIONS__
+@
 #ELSE __HAS_ACCESS_RESTRICTIONS__
+            <gco:CharacterString>None</gco:CharacterString>
 #ENDELSE __HAS_ACCESS_RESTRICTIONS__
+          </gmd:otherConstraints>
+@
         </gmd:MD_LegalConstraints>
       </gmd:resourceConstraints>
+@
 #IF __IS_GRID__
       <gmd:spatialRepresentationType>
         <gmd:MD_SpatialRepresentationTypeCode codeList="http://www.isotc211.org/2005/resources/Codelist/gmxCodelists.xml#MD_SpatialRepresentationTypeCode" codeListValue="grid">grid</gmd:MD_SpatialRepresentationTypeCode>
       </gmd:spatialRepresentationType>
 #ENDIF __IS_GRID__
+@
 #REPEAT __SPATIAL_RESOLUTION__
       <gmd:spatialResolution>
         <gmd:MD_Resolution>
@@ -527,6 +548,7 @@
         </gmd:MD_Resolution>
       </gmd:spatialResolution>
 #ENDREPEAT __SPATIAL_RESOLUTION__
+@
       <gmd:language>
         <gco:CharacterString>eng</gco:CharacterString>
       </gmd:language>
@@ -536,10 +558,12 @@
       <gmd:topicCategory>
         <gmd:MD_TopicCategoryCode>__ISO_TOPIC__</gmd:MD_TopicCategoryCode>
       </gmd:topicCategory>
+@
 #IF __HAS_ANY_EXTENT__
       <gmd:extent>
         <gmd:EX_Extent>
 #ENDIF __HAS_ANY_EXTENT__
+@
 #IF __HAS_POINT__
           <gmd:geographicElement>
             <gmd:EX_BoundingPolygon>
@@ -551,6 +575,7 @@
             </gmd:EX_BoundingPolygon>
           </gmd:geographicElement>
 #ENDIF __HAS_POINT__
+@
 #IF __HAS_BOUNDING_BOX__
           <gmd:geographicElement>
             <gmd:EX_GeographicBoundingBox>
@@ -569,6 +594,7 @@
             </gmd:EX_GeographicBoundingBox>
           </gmd:geographicElement>
 #ENDIF __HAS_BOUNDING_BOX__
+@
 #IF __HAS_GEOGRAPHIC_IDENTIFIERS__
 #REPEAT __GEOGRAPHIC_IDENTIFIER__
           <gmd:geographicElement>
@@ -620,6 +646,7 @@
           </gmd:geographicElement>
 #ENDREPEAT __GEOGRAPHIC_IDENTIFIER__
 #ENDIF __HAS_GEOGRAPHIC_IDENTIFIERS__
+@
 #IF __HAS_TEMPORAL_EXTENT__
           <gmd:temporalElement>
             <gmd:EX_TemporalExtent>
@@ -632,10 +659,12 @@
             </gmd:EX_TemporalExtent>
           </gmd:temporalElement>
 #ENDIF __HAS_TEMPORAL_EXTENT__
+@
 #IF __HAS_ANY_EXTENT__
         </gmd:EX_Extent>
       </gmd:extent>
 #ENDIF __HAS_ANY_EXTENT__
+@
     </gmd:MD_DataIdentification>
   </gmd:identificationInfo>
   <gmd:distributionInfo>
@@ -687,11 +716,13 @@
       </gmd:distributor>
       <gmd:transferOptions>
         <gmd:MD_DigitalTransferOptions>
+@
 #IF __VOLUME_SPECIFIED__
          <gmd:transferSize>
            <gco:Real>__MB_VOLUME__</gco:Real>
          </gmd:transferSize>
 #ENDIF __VOLUME_SPECIFIED__
+@
           <gmd:onLine>
             <gmd:CI_OnlineResource>
               <gmd:linkage>
