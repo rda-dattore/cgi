@@ -10,6 +10,7 @@
 #include <mymap.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
+#include <tokendoc.hpp>
 #include <myerror.hpp>
 
 using namespace PostgreSQL;
@@ -22,6 +23,7 @@ using strutils::append;
 using strutils::replace_all;
 using strutils::split;
 using strutils::substitute;
+using strutils::to_lower;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
@@ -154,261 +156,113 @@ struct ObservationTypeEntry {
 };
 
 void start() {
-  std::ifstream ifs;
-  char line[256];
-  Query query;
-  Row row;
-  string sline,db;
-  std::deque<string> sp;
-  size_t n;
-  string start="1000-01-01",end="3000-12-31";
-  my::map<ObservationTypeEntry> obs_table;
-  ObservationTypeEntry ote;
-  PlatformEntry pe;
-  bool started;
-  GetDataEntry gde;
-  string referer,server_name=getenv("SERVER_NAME");
-
-  db="ObML";
-  if (local_args.getdata_table.size() > 0) {
+  string db = "ObML";
+  if (!local_args.getdata_table.empty()) {
     if (duser().empty()) {
-      referer=getenv("HTTP_REFERER");
+      string referer = getenv("HTTP_REFERER");
       if (!referer.empty()) {
-        replace_all(referer,"https://","");
-        replace_all(referer,"http://","");
-        replace_all(referer,"rda.ucar.edu","");
-        cout << "Location: /cgi-bin/error?code=403&directory="+referer << endl << endl;
-      }
-      else
-        cout << "Location: /cgi-bin/error?code=403&directory="+requestURI << endl << endl;
+        replace_all(referer, "https://", "");
+        replace_all(referer, "http://", "");
+        replace_all(referer, "rda.ucar.edu", "");
+        cout << "Location: /cgi-bin/error?code=403&directory=" << referer <<
+            endl << endl;
+      } else
+        cout << "Location: /cgi-bin/error?code=403&directory=" << requestURI <<
+            endl << endl;
       exit(1);
     }
-    db="W"+db;
+    db = "W" + db;
   }
-  ifs.open((strutils::token("/"+unixutils::host_name(),".",0)+"/web/datasets/"+metautils::args.dsid+"/metadata/customize."+db).c_str());
+  string start = "1000-01-01", end = "3000-12-31";
+  std::ifstream ifs((strutils::token("/" + unixutils::host_name(), ".", 0) +
+      "/web/datasets/" + metautils::args.dsid + "/metadata/customize." + db).
+      c_str());
   if (ifs.is_open()) {
-    ifs.getline(line,256);
-    sp=split(line);
-    start=dateutils::string_ll_to_date_string(sp[0]);
-    end=dateutils::string_ll_to_date_string(sp[1]);
+    char line[256];
+    ifs.getline(line, 256);
+    auto sp = split(line);
+    start = dateutils::string_ll_to_date_string(sp[0]);
+    end = dateutils::string_ll_to_date_string(sp[1]);
     ifs.close();
   }
-  query.set("select i.observation_type_code, o.obs_type, i.platform_type_code, "
-      "p.platform_type from (select distinct observation_type_code, "
-      "platform_type_code from \"" + db + "\"." + metautils::args.dsid +
-      "_id_list) as i left join \"" + db + "\".obs_types as o on o.code = i."
-      "observation_type_code left join \"" + db + "\".platform_types as p on p."
-      "code = i.platform_type_code order by o.obs_type,p.platform_type");
-std::cerr << query.show() << std::endl;
+  Query query("select i.observation_type_code, o.obs_type, i."
+      "platform_type_code, p.platform_type from (select distinct "
+      "observation_type_code, platform_type_code from \"" + db + "\"." +
+      metautils::args.dsid + "_id_list) as i left join \"" + db +
+      "\".obs_types as o on o.code = i.observation_type_code left join \"" + db
+      + "\".platform_types as p on p.code = i.platform_type_code order by o."
+      "obs_type,p.platform_type");
+//std::cerr << query.show() << std::endl;
   if (query.submit(server) < 0) {
     std::cerr << "STATIONVIEWER: error: '" << query.error() << "' for query '"
         << query.show() << "'" << endl;
     web_error("A database error occurred. Please try again later.");
   }
-  while (query.fetch_row(row)) {
-    if (!obs_table.found(row[0],ote)) {
+  my::map<ObservationTypeEntry> obs_table;
+  for (const auto& row : query) {
+    ObservationTypeEntry ote;
+    if (!obs_table.found(row[0], ote)) {
       ote.key=row[0];
       ote.data.reset(new ObservationTypeEntry::Data);
       ote.data->description=row[1];
       obs_table.insert(ote);
     }
-    if (!ote.data->platform_table.found(row[2],pe)) {
-      pe.key=row[2];
+    PlatformEntry pe;
+    if (!ote.data->platform_table.found(row[2], pe)) {
+      pe.key = row[2];
       pe.data.reset(new PlatformEntry::Data);
       pe.data->description=row[3];
       ote.data->platform_table.insert(pe);
     }
   }
-  cout << "Access-Control-Allow-Origin: https://rda.ucar.edu" << endl;
+  TokenDocument tdoc("/data/web/html/stationViewer/start.tdoc");
   cout << "Content-type: text/html" << endl << endl;
-  cout << "<script id=\"gmap_script\" src=\"/js/gmaps3.js\" type=\"text/javascript\"></script>" << endl;
   cout << webutils::php_execute("$mapType=\"Cluster\";$mapDivId=\"map\";$controlSize=\"large\";$zoomLevel=2;include(\"gmap3_key.inc\");") << endl;
-  cout << "<script id=\"calendar_script\" src=\"/js/calendar.js\" type=\"text/javascript\"></script>" << endl;
-  cout << "<link rel=\"stylesheet\" type=\"text/css\" href=\"/css/calendar.css\">" << endl;
-  cout << "<script id=\"map_script\" language=\"javascript\">" << endl;
-  cout << "var dsid='"+metautils::args.dsid+"';" << endl;
-  cout << "var start='"+start+"';" << endl;
-  cout << "var end='"+end+"';" << endl;
-  cout << "var op,qs;" << endl;
-  cout << "function doMapUpdate() {" << endl;
-  cout << "  op='';" << endl;
-  cout << "  qs='';" << endl;
-  cout << "  var num_boxes=0,num_checked=0;" << endl;
-  cout << "  for (n=0; n < document.selections.elements.length; n++) {" << endl;
-  cout << "    if (document.selections.elements[n].type == 'checkbox') {" << endl;
-  cout << "      num_boxes++;" << endl;
-  cout << "      if (document.selections.elements[n].checked) {" << endl;
-  cout << "        if (op.length > 0)" << endl;
-  cout << "          op+='&';" << endl;
-  cout << "        op+='op='+document.selections.elements[n].value;" << endl;
-  cout << "        num_checked++;" << endl;
-  cout << "      }" << endl;
-  cout << "    }" << endl;
-  cout << "  }" << endl;
-  cout << "  var re_date=/^\\s*(\\d{4})\\-(\\d{2})\\-(\\d{2})\\s*$/;" << endl;
-  cout << "  if (!re_date.exec(document.selections.sd.value) || !re_date.exec(document.selections.ed.value))" << endl;
-  cout << "    return alert(\"Dates must be entered as YYYY-MM-DD\");" << endl;
-  cout << "  if (document.selections.ed.value < document.selections.sd.value)" << endl;
-  cout << "    return alert(\"The end date cannot precede the start date\");" << endl;
-  cout << "  if (num_checked == 0)" << endl;
-  cout << "    alert(\"You must choose at least one observation type/platform type for which to display stations\");" << endl;
-  cout << "  else {" << endl;
-  cout << "    if (num_boxes != num_checked) {" << endl;
-  cout << "      if (qs.length > 0)" << endl;
-  cout << "        qs+='&';" << endl;
-  cout << "      qs+=op;" << endl;
-  cout << "    }" << endl;
-  cout << "    if (document.selections.sd.value != start || document.selections.ed.value != end || !document.selections.tspec[0].checked) {" << endl;
-  cout << "      if (qs.length > 0)" << endl;
-  cout << "        qs+='&';" << endl;
-  cout << "      qs+='sd='+document.selections.sd.value+'&ed='+document.selections.ed.value;" << endl;
-  cout << "      for (n=0; n < document.selections.tspec.length; n++) {" << endl;
-  cout << "        if (document.selections.tspec[n].checked)" << endl;
-  cout << "          qs+='&tspec='+document.selections.tspec[n].value;" << endl;
-  cout << "      }" << endl;
-  cout << "    }" << endl;
-  cout << "    if (qs.length == 0)" << endl;
-  cout << "      qs='x=y';" << endl;
-  cout << "    qs+='&slat='+Math.round(map.handles.marker.getBounds().getSouthWest().lat())+'&wlon='+Math.round(map.handles.marker.getBounds().getSouthWest().lng())+'&nlat='+Math.round(map.handles.marker.getBounds().getNorthEast().lat())+'&elon='+Math.round(map.handles.marker.getBounds().getNorthEast().lng())+'&zl='+map.handles.marker.getZoom();" << endl;
-  cout << "    updateMap('https://" << server_name << script_url << "?dsid=" << metautils::args.dsid << "&gindex=" << local_args.gindex << "&'+qs,marker_click_function);" << endl;
-  cout << "  }" << endl;
-//  cout << "  scrollTo('viewer_top');" << endl;
-  cout << "}" << endl;
-  cout << "function doMapUpdate1() {" << endl;
-  cout << "  if (document.sstation.sstn.value.length == 0) {" << endl;
-  cout << "    alert(\"You must enter a value for 'Station ID' if you want to search for specific stations\");" << endl;
-  cout << "    return;" << endl;
-  cout << "  }" << endl;
-  cout << "  var spart_val;" << endl;
-  cout << "  for (n=0; n < document.sstation.spart.length; n++) {" << endl;
-  cout << "    if (document.sstation.spart[n].checked)" << endl;
-  cout << "      spart_val=document.sstation.spart[n].value;" << endl;
-  cout << "  }" << endl;
-  cout << "  var protocol='http';" << endl;
-  cout << "  if (window.location.href.charAt(4) == 's') {" << endl;
-  cout << "    protocol+='s';" << endl;
-  cout << "  }" << endl;
-  cout << "  updateMap(protocol+'://" << server_name << script_url << "?dsid=" << metautils::args.dsid << "&gindex=" << local_args.gindex << "&sstn='+document.sstation.sstn.value+'&spart='+spart_val,marker_click_function);" << endl;
-//  cout << "  scrollTo('viewer_top');" << endl;
-  cout << "  return false;" << endl;
-  cout << "}" << endl;
-  cout << "function fillStationInfoWindow() {" << endl;
-  cout << "  if (xhr.readyState == 4) {" << endl;
-  cout << "    var data=eval('('+xhr.responseText+')');" << endl;
-  cout << "    var content='<small>';" << endl;
-  cout << "    for (n=0; n < data.length; ++n) {" << endl;
-  cout << "      if (n > 0) {" << endl;
-  cout << "        content+='<hr noshade />';" << endl;
-  cout << "      }" << endl;
-  cout << "      content+='<b>ID: </b>'+data[n].ID+'<br /><b>ID Type: </b>'+data[n].t+'<br /><b>Temporal range: </b>'+data[n].sd+' to '+data[n].ed+'<br /><b>Total number of observations: </b>'+data[n].n;" << endl;
-  cout << "      if (typeof(data[n].f) != \"undefined\") {" << endl;
-  cout << "          content+='<br /><b>Approximate frequency: </b>'+data[n].f+' per '+data[n].u;" << endl;
-  cout << "      }" << endl;
-  if (local_args.getdata_table.size() > 0)
-    cout << "      content+='<table class=small cellspacing=0 cellpadding=0 border=0><tr valign=top><td><b>Data:</b>&nbsp;</td><td>";
-  n=0;
-  for (auto method : local_args.getdata_methods) {
-    if (n > 0) {
-      cout << "<br />";
+  tdoc.add_replacement("__DSID__", metautils::args.dsid);
+  tdoc.add_replacement("__START_DATE__", start);
+  tdoc.add_replacement("__END_DATE__", end);
+  tdoc.add_replacement("__SERVER_NAME__", getenv("SERVER_NAME"));
+  tdoc.add_replacement("__SCRIPT_URL__", script_url);
+  tdoc.add_replacement("__GINDEX__", local_args.gindex);
+  if (!local_args.getdata_table.empty()) {
+    tdoc.add_if("__HAS_METHODS__");
+    string methods;
+    for (auto method : local_args.getdata_methods) {
+      GetDataEntry gde;
+      local_args.getdata_table.found(method, gde);
+      append(methods, "<a href=\"" + gde.script + "?station=' + data[n].ID + "
+          "'&sd=' + document.selections.sd.value + '&ed=' + "
+          "document.selections.ed.value + '", "<br>");
+      for (auto item : gde.nvp_list) {
+        auto sp = split(item, "=");
+        if (sp.size() == 2) {
+          methods += "&" + sp[0] + "=" + sp[1];
+        }
+      }
+      methods += "\"";
+      if (gde.target == "new") {
+        methods += " target=\"_" + to_lower(substitute(gde.script, " ", "_")) +
+            "\"";
+      }
+      methods += ">" + method + "</a>";
     }
-    local_args.getdata_table.found(method,gde);
-    cout << "<a href=\""+gde.script+"?station='+data[n].ID+'&sd='+document.selections.sd.value+'&ed='+document.selections.ed.value+'";
-    for (auto item : gde.nvp_list) {
-      sp=split(item,"=");
-      if (sp.size() == 2)
-        cout << "&"+sp[0]+"="+sp[1];
-    }
-    cout << "\"";
-    if (gde.target == "new")
-      cout << " target=\"_"+strutils::to_lower(substitute(gde.script," ","_"))+"\"";
-    cout << ">"+method+"</a>";
-    n++;
+    tdoc.add_replacement("__METHODS__", methods);
   }
-  if (local_args.getdata_table.size() > 0) {
-    cout << "</td></tr></table>';" << endl;
-  }
-  cout << "    }" << endl;
-  cout << "    content+='</small>';" << endl;
-  cout << "    infoWindow.setContent(content);" << endl;
-  cout << "    if (typeof(data[0].b) != \"undefined\") {" << endl;
-  cout << "        var start=new google.maps.LatLng(data[0].b[0],data[0].b[1]);" << endl;
-  cout << "        var coords=[start,new google.maps.LatLng(data[0].b[2],data[0].b[1]),new google.maps.LatLng(data[0].b[2],data[0].b[3]),new google.maps.LatLng(data[0].b[0],data[0].b[3]),start];" << endl;
-  cout << "        box=new google.maps.Polygon({paths: coords, strokeColor: \"#ff0000\", strokeWeight: 1, fillColor: \"#ff0000\", fillOpacity: 0.2});" << endl;
-  cout << "        box.setMap(map.handles.marker);" << endl;
-  cout << "        boxArray.push(box);" << endl;
-  cout << "    }" << endl;
-  cout << "  }" << endl;
-  cout << "}" << endl;
-  cout << "function marker_click_function() {" << endl;
-//cout << "alert(this.icon.anchor.x);" << endl;
-  cout << "  if (infoWindow != null)" << endl;
-  cout << "    infoWindow.close();" << endl;
-  cout << "  if (typeof(infoWindowArray[this.getTitle()]) == \"undefined\") {" << endl;
-  cout << "    var x_offset=0,y_offset=0;" << endl;
-  cout << "    if (this.icon.anchor.x == 16 && this.icon.anchor.y == 32) {" << endl;
-  cout << "      x_offset=0;" << endl;
-  cout << "      y_offset=10;" << endl;
-  cout << "    }" << endl;
-  cout << "    else if (this.icon.anchor.x == 0 && this.icon.anchor.y == 16) {" << endl;
-  cout << "      x_offset=6;" << endl;
-  cout << "      y_offset=15;" << endl;
-  cout << "    }" << endl;
-  cout << "    if (this.icon.anchor.x == 16 && this.icon.anchor.y == 0) {" << endl;
-  cout << "      x_offset=0;" << endl;
-  cout << "      y_offset=22;" << endl;
-  cout << "    }" << endl;
-  cout << "    else if (this.icon.anchor.x == 32 && this.icon.anchor.y == 16) {" << endl;
-  cout << "      x_offset=-6;" << endl;
-  cout << "      y_offset=15;" << endl;
-  cout << "    }" << endl;
-  cout << "    infoWindow=new google.maps.InfoWindow({pixelOffset: new google.maps.Size(x_offset,y_offset)});" << endl;
-  cout << "    infoWindow.setContent('<center><table><tr valign=\"middle\"><td><img src=\"/images/wait.gif\"></td><td>Loading...</td></tr></table></center>');" << endl;
-  cout << "    infoWindowArray[this.getTitle()]=infoWindow;" << endl;
-  cout << "    var u='" << script_url << "?dsid='+dsid+'&ID='+this.getTitle();" << endl;
-  cout << "    if (typeof(op) != \"undefined\" && op.length > 0)" << endl;
-  cout << "      u+='&'+op;" << endl;
-cout << "console.log(u);" << endl;
-  cout << "    submitRequest(u,fillStationInfoWindow);" << endl;
-  cout << "  }" << endl;
-  cout << "  else" << endl;
-  cout << "    infoWindow=infoWindowArray[this.getTitle()];" << endl;
-  cout << "  infoWindow.open(map.handles.marker,this);" << endl;
-  cout << "}" << endl;
-  cout << "</script>" << endl;
-  cout << "<div id=\"viewer_top\" style=\"font-size: 20px; font-weight: bold; width: 100%; margin-top: 10px; margin-bottom: 15px\">";
   if (!local_args.title.empty()) {
-    cout << local_args.title;
+    tdoc.add_replacement("__TITLE__", local_args.title);
+  } else {
+    tdoc.add_replacement("__TITLE__", "Interactive Station Viewer");
   }
-  else {
-    cout << "Interactive Station Viewer";
-  }
-  cout << "</div>" << endl;
-  cout << "<p>";
   if (!local_args.info.empty()) {
-    cout << local_args.info;
+    tdoc.add_replacement("__INFO__", local_args.info);
+  } else {
+    tdoc.add_replacement("__INFO__", "Use the interactive map to pan and zoom to your area of interest.  Then make selections in the panel to the right.  Stations that match your selections will be displayed on the map.  You can then click individual station markers to get detailed information about each station.");
   }
-  else {
-    cout << "Use the interactive map to pan and zoom to your area of interest.  Then make selections in the panel to the right.  Stations that match your selections will be displayed on the map.  You can then click individual station markers to get detailed information about each station.";
-  }
-  cout << "</p>" << endl;
-  cout << "<table width=\"100%\" cellspacing=\"0\" cellpadding=\"5\" border=\"0\"><tr valign=\"top\">" << endl;
-  cout << "<td width=\"700\"><div id=\"map\" style=\"width: 700px; height: 700px; border: thin solid black\"></div><p class=\"nice\">Legend:<br><img src=\"/images/gmaps/blue-dot.png\" width=\"20\" height=\"20\">&nbsp;indicates a station that has not moved for the entire specified temporal period<br><img src=\"/images/gmaps/red.png\" width=\"20\" height=\"20\">&nbsp;indicates a station that has moved within a box: the marker location (which will appear when you click the marker) is the center of the bounding box; the station may never have actually been located at this position<br><table cellspacing=\"0\" cellpadding=\"0\" border=\"0\"><tr valign=\"middle\"><td style=\"background-image: url('/images/gmaps/cluster-purple_legend.png'); width: 40px; height: 40px; font-size: 10px; font-family: helvetica,arial,verdana,sans-serif; text-align: center\"><b>37</b></td><td class=\"nice\">&nbsp;icons like these indicate clusters of stations; click on a cluster icon to zoom in to more detail</td></tr></table></p></td>" << endl;
-  cout << "<td><p>Use the interactive map to pan and zoom to your area of interest.  Then, show stations on the map for the following selections:</p>" << endl;
-  cout << "<hr noshade>" << endl;
-  cout << "<form class=\"ds\" name=\"selections\"><div class=\"mb-2\"><b>"
-      "Temporal Range:</b><br><input type=\"text\" name=\"sd\" value=\"" <<
-      start << "\" size=\"12\" maxlength=\"12\">&nbsp;<img class=\"calendar\" "
-      "src=\"/images/calendar/cal.gif\" onclick=\"howCalendar('calendar', "
-      "'selections.sd')\"><br>to<br><input type=\"text\" name=\"ed\" value=\""
-      << end << "\" size=\"12\" maxlength=\"12\">&nbsp;<img class=\"calendar\" "
-      "src=\"/images/calendar/cal.gif\" onclick=\"howCalendar('calendar', "
-      "'selections.ed')\"><br>portion of temporal range:<br><input type=\""
-      "radio\" name=\"tspec\" value=\"any\" checked>&nbsp;any<br><input type=\""
-      "radio\" name=\"tspec\" value=\"all\">&nbsp;all</div>" << endl;
-  cout << "<table cellspacing=\"2\" cellpadding=\"5\" border=\"0\"><tr bgcolor=\"#c8daff\"><th>Type of Observation</th><th align=\"left\">Type of Platform</th></tr>" << endl;
+  cout << tdoc << endl;
   for (auto& key : obs_table.keys()) {
-    started=false;
-    obs_table.found(key,ote);
+    auto started = false;
+    ObservationTypeEntry ote;
+    obs_table.found(key, ote);
     for (auto& key2 : ote.data->platform_table.keys()) {
       if (!started) {
         cout << "<tr bgcolor=\"#e1eaff\" valign=\"middle\"><td align=\"center\" rowspan=\"" << ote.data->platform_table.size() << "\">" << strutils::to_capital(ote.data->description) << "</td>";
@@ -417,7 +271,8 @@ cout << "console.log(u);" << endl;
       else {
         cout << "<tr bgcolor=\"#e1eaff\">";
       }
-      ote.data->platform_table.found(key2,pe);
+      PlatformEntry pe;
+      ote.data->platform_table.found(key2, pe);
       cout << "<td><input type=\"checkbox\" value=\"" << ote.key << "," << pe.key << "\"";
       if (obs_table.size() == 1 && ote.data->platform_table.size() == 1) {
         cout << " checked";
@@ -532,7 +387,7 @@ void get_stations() {
   metautils::StringEntry se;
 
   if (!local_args.gindex.empty()) {
-    query.set("wfile","dssdb.wfile","dsid = '"+metautils::args.dsid+"' and type = 'D' and status = 'P' and tindex = "+local_args.gindex);
+    query.set("wfile","dssdb.wfile_" + metautils::args.dsid,"type = 'D' and status = 'P' and tindex = "+local_args.gindex);
     if (query.submit(server) < 0) {
       std::cerr << "STATIONVIEWER: error: '" << server.error() << "' for query '" <<
           query.show() << "'" << std::endl;
