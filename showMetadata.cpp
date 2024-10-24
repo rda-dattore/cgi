@@ -14,7 +14,10 @@ using std::endl;
 using std::string;
 using std::stringstream;
 using std::unique_ptr;
+using strutils::ds_aliases;
+using strutils::ng_gdex_id;
 using strutils::replace_all;
+using strutils::to_sql_tuple_string;
 
 metautils::Directives metautils::directives;
 metautils::Args metautils::args;
@@ -33,7 +36,7 @@ void parseQuery() {
   if (!v.empty()) {
     local_args.action = v;
   }
-  metautils::args.dsnum = query_string.value("dsnum");
+  metautils::args.dsid = query_string.value("dsnum");
   local_args.format = query_string.value("format");
 }
 
@@ -41,11 +44,11 @@ void list_formats() {
   cout << "Content-type: text/html" << endl << endl;
   TokenDocument tdoc("/usr/local/www/server_root/web/html/oai/showMetadata-"
       "format-menu.html");
-  tdoc.add_replacement("__DSNUM__", metautils::args.dsnum);
+  tdoc.add_replacement("__DSNUM__", metautils::args.dsid);
   Server server(metautils::directives.database_server, metautils::directives.
       metadb_username, metautils::directives.metadb_password, "rdadb");
-  LocalQuery q("doi", "dssdb.dsvrsn", "dsid = 'ds" + metautils::args.dsnum +
-      "' and status = 'A'");
+  LocalQuery q("doi", "dssdb.dsvrsn", "dsid in " + to_sql_tuple_string(
+      ds_aliases(ng_gdex_id(metautils::args.dsid))) + " and status = 'A'");
   Row row;
   if (q.submit(server) == 0 && q.fetch_row(row)) {
     tdoc.add_repeat("__FORMAT_OPTIONS__", TokenDocument::REPEAT_PAIRS{
@@ -89,7 +92,7 @@ void get_content() {
   stringstream xmlss;
   unique_ptr<TokenDocument> token_doc;
   metadataExport::export_metadata(local_args.format, token_doc, xmlss,
-      metautils::args.dsnum);
+      metautils::args.dsid);
   auto xs = xmlss.str();
   replace_all(xs, "<", "&lt;");
   replace_all(xs, ">", "&gt;");
