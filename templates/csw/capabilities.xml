@@ -9,11 +9,11 @@
 #ENDIF __PRINT_SERVICE_IDENTIFICATION__
   <ows:ServiceProvider>
     <ows:ProviderName>NCAR Research Data Archive</ows:ProviderName>
-    <ows:ProviderSite xlink:href="https://rda.ucar.edu/" />
+    <ows:ProviderSite xlink:href="https://gdex.ucar.edu/" />
     <ows:ServiceContact>
       <ows:OrganisationName>NCAR Research Data Archive</ows:OrganisationName>
       <ows:ContactInfo>
-        <ows:OnlineResource xlink:href="mailto:rdahelp@ucar.edu" />
+        <ows:OnlineResource xlink:href="mailto:datahelp@ucar.edu" />
       </ows:ContactInfo>
     </ows:ServiceContact>
   </ows:ServiceProvider>
@@ -22,8 +22,8 @@
     <ows:Operation name="GetCapabilities">
       <ows:DCP>
         <ows:HTTP>
-          <ows:Get xlink:href="http://rda.ucar.edu/cgi-bin/csw" />
-          <ows:Post xlink:href="http://rda.ucar.edu/cgi-bin/csw" />
+          <ows:Get xlink:href="http://gdex.ucar.edu/cgi-bin/csw" />
+          <ows:Post xlink:href="http://gdex.ucar.edu/cgi-bin/csw" />
         </ows:HTTP>
       </ows:DCP>
       <ows:Parameter name="Sections">
@@ -36,16 +36,16 @@
     <ows:Operation name="DescribeRecord">
       <ows:DCP>
         <ows:HTTP>
-          <ows:Get xlink:href="http://rda.ucar.edu/cgi-bin/csw" />
-          <ows:Post xlink:href="http://rda.ucar.edu/cgi-bin/csw" />
+          <ows:Get xlink:href="http://gdex.ucar.edu/cgi-bin/csw" />
+          <ows:Post xlink:href="http://gdex.ucar.edu/cgi-bin/csw" />
         </ows:HTTP>
       </ows:DCP>
     </ows:Operation>
     <ows:Operation name="GetRecords">
       <ows:DCP>
         <ows:HTTP>
-          <ows:Get xlink:href="http://rda.ucar.edu/cgi-bin/csw" />
-          <ows:Post xlink:href="http://rda.ucar.edu/cgi-bin/csw" />
+          <ows:Get xlink:href="http://gdex.ucar.edu/cgi-bin/csw" />
+          <ows:Post xlink:href="http://gdex.ucar.edu/cgi-bin/csw" />
         </ows:HTTP>
       </ows:DCP>
       <ows:Parameter name="ElementSetName">
