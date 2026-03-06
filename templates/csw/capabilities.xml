@@ -2,16 +2,16 @@
 <csw:Capabilities xmlns:csw="http://www.opengis.net/cat/csw/2.0.2" xmlns:ows="http://www.opengis.net/ows" xmlns:ogc="http://www.opengis.net/ogc" xmlns:gml="http://www.opengis.net/gml" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.opengis.net/cat/csw/2.0.2 http://schemas.opengis.net/csw/2.0.2/CSW-discovery.xsd" version="2.0.2">
 #IF __PRINT_SERVICE_IDENTIFICATION__
   <ows:ServiceIdentification>
-    <ows:Title>Research Data Archive at NCAR OGC CSW Server</ows:Title>
+    <ows:Title>NSF NCAR Geoscience Data EXchange CSW Server</ows:Title>
     <ows:ServiceType>CSW</ows:ServiceType>
     <ows:ServiceTypeVersion>2.0.2</ows:ServiceTypeVersion>
   </ows:ServiceIdentification>
 #ENDIF __PRINT_SERVICE_IDENTIFICATION__
   <ows:ServiceProvider>
-    <ows:ProviderName>NCAR Research Data Archive</ows:ProviderName>
+    <ows:ProviderName>NSF NCAR Geoscience Data EXchange</ows:ProviderName>
     <ows:ProviderSite xlink:href="https://gdex.ucar.edu/" />
     <ows:ServiceContact>
-      <ows:OrganisationName>NCAR Research Data Archive</ows:OrganisationName>
+      <ows:OrganisationName>NSF National Center for Atmospheric Research</ows:OrganisationName>
       <ows:ContactInfo>
         <ows:OnlineResource xlink:href="mailto:datahelp@ucar.edu" />
       </ows:ContactInfo>
