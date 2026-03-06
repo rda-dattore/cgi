@@ -6,7 +6,7 @@
     <ows:ServiceType>CSW</ows:ServiceType>
     <ows:ServiceTypeVersion>2.0.2</ows:ServiceTypeVersion>
   </ows:ServiceIdentification>
-#ENDIF
+#ENDIF __PRINT_SERVICE_IDENTIFICATION__
   <ows:ServiceProvider>
     <ows:ProviderName>NCAR Research Data Archive</ows:ProviderName>
     <ows:ProviderSite xlink:href="https://rda.ucar.edu/" />
@@ -84,7 +84,7 @@
       <ows:Value>csw:AnyText</ows:Value>
     </ows:Constraint>
   </ows:OperationsMetadata>
-#ENDIF
+#ENDIF __PRINT_OPERATIONS_METADATA__
   <ogc:Filter_Capabilities>
     <ogc:Spatial_Capabilities>
       <ogc:GeometryOperands>
