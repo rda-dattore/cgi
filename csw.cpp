@@ -3,7 +3,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <unordered_set>
-#include <MySQL.hpp>
+#include <PostgreSQL.hpp>
 #include <strutils.hpp>
 #include <utils.hpp>
 #include <xmlutils.hpp>
@@ -12,6 +12,10 @@
 #include <tokendoc.hpp>
 #include <metadata_export.hpp>
 #include <myerror.hpp>
+
+using namespace PostgreSQL;
+using std::cout;
+using std::endl;
 
 std::string myerror="";
 std::string mywarning="";
@@ -54,18 +58,18 @@ const std::unordered_set<std::string> DUBLIN_CORE_QUERYABLES{"dc:title","dc:type
 
 void print_exception_report(std::string exception_code,std::string locator,std::string exception_text = "")
 {
-  std::cout << "Content-type: application/xml" << std::endl << std::endl;
-  std::cout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << std::endl;
-  std::cout << "<ExceptionReport xmlns=\"http://www.opengis.net/ows/2.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.opengis.net/ows/2.0 http://schemas.opengis.net/ows/1.0.0/owsExceptionReport.xsd\" version=\"2.0.2\">" << std::endl;
-  std::cout << "  <Exception exceptionCode=\"" << exception_code << "\"";
+  cout << "Content-type: application/xml" << endl << endl;
+  cout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << endl;
+  cout << "<ExceptionReport xmlns=\"http://www.opengis.net/ows/2.0\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.opengis.net/ows/2.0 http://schemas.opengis.net/ows/1.0.0/owsExceptionReport.xsd\" version=\"2.0.2\">" << endl;
+  cout << "  <Exception exceptionCode=\"" << exception_code << "\"";
   if (!locator.empty()) {
-    std::cout << " locator=\"" << locator << "\"";
+    cout << " locator=\"" << locator << "\"";
   }
-  std::cout << " />" << std::endl;
+  cout << " />" << endl;
   if (!exception_text.empty()) {
-    std::cout << "  <ExceptionText>" << exception_text << "</ExceptionText>" << std::endl;
+    cout << "  <ExceptionText>" << exception_text << "</ExceptionText>" << endl;
   }
-  std::cout << "</ExceptionReport>" << std::endl;
+  cout << "</ExceptionReport>" << endl;
   exit(1);
 }
 
@@ -192,8 +196,8 @@ std::string post_xml_to_query(std::string xml)
       query+=kvp.second[n];
     }
   }
-std::cout << "Content-type: text/plain" << std::endl << std::endl;
-std::cout << query << std::endl;
+cout << "Content-type: text/plain" << endl << endl;
+cout << query << endl;
   return query;
 }
 
@@ -238,10 +242,10 @@ std::string response_root()
   }
 }
 
-void get_summary_records(MySQL::Server& server,size_t max_records)
+void get_summary_records(Server& server,size_t max_records)
 {
-  MySQL::LocalQuery query;
-  MySQL::Row row;
+  LocalQuery query;
+  Row row;
   std::stringstream qspec;
 
   if (constraint.contains_format || constraint.contains_subject) {
@@ -280,70 +284,70 @@ void get_summary_records(MySQL::Server& server,size_t max_records)
     qspec << ") as x group by x.dsid";
   }
   query.set(qspec.str());
-std::cerr << query.show() << std::endl;
+std::cerr << query.show() << endl;
   if (query.submit(server) < 0) {
-    std::cerr << "CSW Server Error (summary) - " << query.show() << std::endl;
+    std::cerr << "CSW Server Error (summary) - " << query.show() << endl;
     process_query_error(query.error());
   }
-  std::cout << "Content-type: application/xml" << std::endl << std::endl;
-  std::cout << "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" << std::endl;
-  std::cout << "<csw:" << response_root() << "Response xmlns:csw=\"http://www.opengis.net/cat/csw/2.0.2\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:dct=\"http://purl.org/dc/terms/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.opengis.net/cat/csw/2.0.2 http://schemas.opengis.net/csw/2.0.2/CSW-discovery.xsd\">" << std::endl;
-  std::cout << "  <csw:SearchStatus timestamp=\"" << dateutils::current_date_time().to_string("%ISO8601") << "\" />" << std::endl;
-  std::cout << "  <csw:SearchResults elementSet=\"summary\" numberOfRecordsMatched=\"" << query.num_rows() << "\" numberOfRecordsReturned=\"" << query.num_rows() << "\" nextRecord=\"0\">" << std::endl;
+  cout << "Content-type: application/xml" << endl << endl;
+  cout << "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" << endl;
+  cout << "<csw:" << response_root() << "Response xmlns:csw=\"http://www.opengis.net/cat/csw/2.0.2\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:dct=\"http://purl.org/dc/terms/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.opengis.net/cat/csw/2.0.2 http://schemas.opengis.net/csw/2.0.2/CSW-discovery.xsd\">" << endl;
+  cout << "  <csw:SearchStatus timestamp=\"" << dateutils::current_date_time().to_string("%ISO8601") << "\" />" << endl;
+  cout << "  <csw:SearchResults elementSet=\"summary\" numberOfRecordsMatched=\"" << query.num_rows() << "\" numberOfRecordsReturned=\"" << query.num_rows() << "\" nextRecord=\"0\">" << endl;
   while (query.fetch_row(row)) {
-    std::cout << "    <csw:SummaryRecord>" << std::endl;
-    std::cout << "      <dc:identifier>" << row[1] << "</dc:identifier>" << std::endl;
+    cout << "    <csw:SummaryRecord>" << endl;
+    cout << "      <dc:identifier>" << row[1] << "</dc:identifier>" << endl;
     if (!row[4].empty()) {
-      std::cout << "      <dc:identifier>" << row[4] << "</dc:identifier>" << std::endl;
+      cout << "      <dc:identifier>" << row[4] << "</dc:identifier>" << endl;
     }
-    std::cout << "      <dc:title>" << row[2] << "</dc:title>" << std::endl;
-    std::cout << "      <dc:type>Dataset</dc:type>" << std::endl;
+    cout << "      <dc:title>" << row[2] << "</dc:title>" << endl;
+    cout << "      <dc:type>Dataset</dc:type>" << endl;
     if (constraint.contains_subject) {
       auto sp=strutils::split(row[constraint.subject_index],",");
       for (auto& p : sp) {
-        std::cout << "      <dc:subject>" << p << "</dc:subject>" << std::endl;
+        cout << "      <dc:subject>" << p << "</dc:subject>" << endl;
       }
     }
     else {
-      MySQL::LocalQuery query2;
+      LocalQuery query2;
       query2.set("keyword","search.variables","dsid = '"+row[0]+"' and vocabulary = 'GCMD'");
       if (query2.submit(server) == 0) {
-        MySQL::Row row2;
+        Row row2;
         while (query2.fetch_row(row2)) {
-          std::cout << "      <dc:subject>" << row2[0] << "</dc:subject>" << std::endl;
+          cout << "      <dc:subject>" << row2[0] << "</dc:subject>" << endl;
         }
       }
     }
     if (constraint.contains_format) {
       auto sp=strutils::split(row[constraint.format_index],",");
       for (auto& p : sp) {
-        std::cout << "      <dc:format>" << p << "</dc:format>" << std::endl;
+        cout << "      <dc:format>" << p << "</dc:format>" << endl;
       }
     }
     else {
-      MySQL::LocalQuery query2;
+      LocalQuery query2;
       query2.set("keyword","search.formats","dsid = '"+row[0]+"'");
       if (query2.submit(server) == 0) {
-        MySQL::Row row2;
+        Row row2;
         while (query2.fetch_row(row2)) {
-          std::cout << "      <dc:format>" << strutils::to_capital(strutils::substitute(row2[0],"proprietary_","")) << "</dc:format>" << std::endl;
+          cout << "      <dc:format>" << strutils::to_capital(strutils::substitute(row2[0],"proprietary_","")) << "</dc:format>" << endl;
         }
       }
     }
-    std::cout << "      <dct:modified>" << row[5] << "</dct:modified>" << std::endl;
+    cout << "      <dct:modified>" << row[5] << "</dct:modified>" << endl;
     auto abstract=htmlutils::convert_html_summary_to_ascii("<summary>"+row[3]+"</summary>",74,6);
     strutils::trim(abstract);
-    std::cout << "      <dct:abstract>" << abstract << "</dct:abstract>" << std::endl;
-    std::cout << "    </csw:SummaryRecord>" << std::endl;
+    cout << "      <dct:abstract>" << abstract << "</dct:abstract>" << endl;
+    cout << "    </csw:SummaryRecord>" << endl;
   }
-  std::cout << "  </csw:SearchResults>" << std::endl;
-  std::cout << "</csw:" << response_root() << "Response>" << std::endl;
+  cout << "  </csw:SearchResults>" << endl;
+  cout << "</csw:" << response_root() << "Response>" << endl;
 }
 
-void get_brief_records(MySQL::Server& server,size_t max_records)
+void get_brief_records(Server& server,size_t max_records)
 {
-  MySQL::LocalQuery query;
-  MySQL::Row row;
+  LocalQuery query;
+  Row row;
   std::stringstream qspec;
 
   qspec << "select s.dsid,concat('edu.ucar.rda:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified` from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H')";
@@ -353,23 +357,23 @@ void get_brief_records(MySQL::Server& server,size_t max_records)
   qspec << " order by s.dsid";
   query.set(qspec.str());
   if (query.submit(server) < 0) {
-    std::cerr << "CSW Server Error (brief) - " << query.show() << std::endl;
+    std::cerr << "CSW Server Error (brief) - " << query.show() << endl;
     process_query_error(query.error());
   }
-  std::cout << "Content-type: application/xml" << std::endl << std::endl;
-  std::cout << "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" << std::endl;
-  std::cout << "<csw:" << response_root() << "Response xmlns:csw=\"http://www.opengis.net/cat/csw/2.0.2\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:dct=\"http://purl.org/dc/terms/\" xmlns:ows=\"http://www.opengis.net/ows\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.opengis.net/cat/csw/2.0.2 http://schemas.opengis.net/csw/2.0.2/CSW-discovery.xsd\">" << std::endl;
-  std::cout << "  <csw:SearchStatus timestamp=\"" << dateutils::current_date_time().to_string("%ISO8601") << "\" />" << std::endl;
-  std::cout << "  <csw:SearchResults elementSet=\"brief\" numberOfRecordsMatched=\"" << query.num_rows() << "\" numberOfRecordsReturned=\"" << query.num_rows() << "\" nextRecord=\"0\">" << std::endl;
+  cout << "Content-type: application/xml" << endl << endl;
+  cout << "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" << endl;
+  cout << "<csw:" << response_root() << "Response xmlns:csw=\"http://www.opengis.net/cat/csw/2.0.2\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:dct=\"http://purl.org/dc/terms/\" xmlns:ows=\"http://www.opengis.net/ows\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.opengis.net/cat/csw/2.0.2 http://schemas.opengis.net/csw/2.0.2/CSW-discovery.xsd\">" << endl;
+  cout << "  <csw:SearchStatus timestamp=\"" << dateutils::current_date_time().to_string("%ISO8601") << "\" />" << endl;
+  cout << "  <csw:SearchResults elementSet=\"brief\" numberOfRecordsMatched=\"" << query.num_rows() << "\" numberOfRecordsReturned=\"" << query.num_rows() << "\" nextRecord=\"0\">" << endl;
   while (query.fetch_row(row)) {
-    std::cout << "    <csw:BriefRecord>" << std::endl;
-    std::cout << "      <dc:identifier>" << row[1] << "</dc:identifier>" << std::endl;
+    cout << "    <csw:BriefRecord>" << endl;
+    cout << "      <dc:identifier>" << row[1] << "</dc:identifier>" << endl;
     if (!row[3].empty()) {
-      std::cout << "      <dc:identifier>" << row[3] << "</dc:identifier>" << std::endl;
+      cout << "      <dc:identifier>" << row[3] << "</dc:identifier>" << endl;
     }
-    std::cout << "      <dc:title>" << row[2] << "</dc:title>" << std::endl;
-    std::cout << "      <dc:type>Dataset</dc:type>" << std::endl;
-    static MySQL::Server geo_server("rda-db.ucar.edu","metadata","metadata","");
+    cout << "      <dc:title>" << row[2] << "</dc:title>" << endl;
+    cout << "      <dc:type>Dataset</dc:type>" << endl;
+    static Server geo_server("rda-db.ucar.edu","metadata","metadata","");
     XMLDocument xdoc("/data/web/datasets/ds"+row[0]+"/metadata/dsOverview.xml");
     double min_west_lon,min_south_lat,max_east_lon,max_north_lat;
     bool is_grid;
@@ -390,17 +394,17 @@ void get_brief_records(MySQL::Server& server,size_t max_records)
         max_east_lon+=360.;
       }
     }
-    std::cout << "      <ows:BoundingBox>" << std::endl;
-    std::cout << "        <ows:LowerCorner>" << min_west_lon << " " << min_south_lat << "</ows:LowerCorner>" << std::endl;
-    std::cout << "        <ows:UpperCorner>" << max_east_lon << " " << max_north_lat << "</ows:UpperCorner>" << std::endl;
-    std::cout << "      </ows:BoundingBox>" << std::endl;
-    std::cout << "    </csw:BriefRecord>" << std::endl;
+    cout << "      <ows:BoundingBox>" << endl;
+    cout << "        <ows:LowerCorner>" << min_west_lon << " " << min_south_lat << "</ows:LowerCorner>" << endl;
+    cout << "        <ows:UpperCorner>" << max_east_lon << " " << max_north_lat << "</ows:UpperCorner>" << endl;
+    cout << "      </ows:BoundingBox>" << endl;
+    cout << "    </csw:BriefRecord>" << endl;
   }
-  std::cout << "  </csw:SearchResults>" << std::endl;
-  std::cout << "</csw:" << response_root() << "Response>" << std::endl;
+  cout << "  </csw:SearchResults>" << endl;
+  cout << "</csw:" << response_root() << "Response>" << endl;
 }
 
-void get_full_records(MySQL::Server& server,size_t max_records)
+void get_full_records(Server& server,size_t max_records)
 {
   std::stringstream qspec;
   qspec << "select s.dsid,concat('edu.ucar.rda:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,s.summary as `dct:abstract`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified` from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H')";
@@ -408,48 +412,48 @@ void get_full_records(MySQL::Server& server,size_t max_records)
     qspec << " having (" << constraint.predicate << ")";
   }
   qspec << " order by s.dsid";
-  MySQL::LocalQuery query(qspec.str());
+  LocalQuery query(qspec.str());
   if (query.submit(server) < 0) {
-    std::cerr << "CSW Server Error (full) - " << query.show() << "; " << query.error() << std::endl;
+    std::cerr << "CSW Server Error (full) - " << query.show() << "; " << query.error() << endl;
     process_query_error(query.error());
   }
-  std::cout << "Content-type: application/xml" << std::endl << std::endl;
-  std::cout << "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" << std::endl;
-  std::cout << "<csw:" << response_root() << "Response xmlns:csw=\"http://www.opengis.net/cat/csw/2.0.2\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:dct=\"http://purl.org/dc/terms/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.opengis.net/cat/csw/2.0.2 http://schemas.opengis.net/csw/2.0.2/CSW-discovery.xsd\">" << std::endl;
-  std::cout << "  <csw:SearchStatus timestamp=\"" << dateutils::current_date_time().to_string("%ISO8601") << "\" />" << std::endl;
-  std::cout << "  <csw:SearchResults elementSet=\"full\" numberOfRecordsMatched=\"" << query.num_rows() << "\" numberOfRecordsReturned=\"" << query.num_rows() << "\" nextRecord=\"0\">" << std::endl;
-  MySQL::Row row;
+  cout << "Content-type: application/xml" << endl << endl;
+  cout << "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" << endl;
+  cout << "<csw:" << response_root() << "Response xmlns:csw=\"http://www.opengis.net/cat/csw/2.0.2\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:dct=\"http://purl.org/dc/terms/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.opengis.net/cat/csw/2.0.2 http://schemas.opengis.net/csw/2.0.2/CSW-discovery.xsd\">" << endl;
+  cout << "  <csw:SearchStatus timestamp=\"" << dateutils::current_date_time().to_string("%ISO8601") << "\" />" << endl;
+  cout << "  <csw:SearchResults elementSet=\"full\" numberOfRecordsMatched=\"" << query.num_rows() << "\" numberOfRecordsReturned=\"" << query.num_rows() << "\" nextRecord=\"0\">" << endl;
+  Row row;
   while (query.fetch_row(row)) {
-    std::cout << "    <csw:Record>" << std::endl;
-    std::cout << "      <dc:identifier>" << row[1] << "</dc:identifier>" << std::endl;
+    cout << "    <csw:Record>" << endl;
+    cout << "      <dc:identifier>" << row[1] << "</dc:identifier>" << endl;
     if (!row[4].empty()) {
-      std::cout << "      <dc:identifier>" << row[4] << "</dc:identifier>" << std::endl;
+      cout << "      <dc:identifier>" << row[4] << "</dc:identifier>" << endl;
     }
-    std::cout << "      <dc:title>" << row[2] << "</dc:title>" << std::endl;
-    std::cout << "      <dc:type>Dataset</dc:type>" << std::endl;
-    MySQL::LocalQuery query2;
+    cout << "      <dc:title>" << row[2] << "</dc:title>" << endl;
+    cout << "      <dc:type>Dataset</dc:type>" << endl;
+    LocalQuery query2;
     query2.set("select g.path from search.variables_new as v left join search.GCMD_sciencekeywords as g on g.uuid = v.keyword where v.vocabulary = 'GCMD' and v.dsid = '"+row[0]+"'");
     if (query2.submit(server) == 0) {
-      MySQL::Row row2;
+      Row row2;
       while (query2.fetch_row(row2)) {
-        std::cout << "      <dc:subject>" << row2[0] << "</dc:subject>" << std::endl;
+        cout << "      <dc:subject>" << row2[0] << "</dc:subject>" << endl;
       }
     }
     query2.set("distinct keyword","search.formats","dsid = '"+row[0]+"'");
     if (query2.submit(server) == 0) {
-      MySQL::Row row2;
+      Row row2;
       while (query2.fetch_row(row2)) {
-        std::cout << "      <dc:format>" << strutils::to_capital(strutils::substitute(row2[0],"proprietary_","")) << "</dc:format>" << std::endl;
+        cout << "      <dc:format>" << strutils::to_capital(strutils::substitute(row2[0],"proprietary_","")) << "</dc:format>" << endl;
       }
     }
-    std::cout << "      <dct:modified>" << row[5] << "</dct:modified>" << std::endl;
+    cout << "      <dct:modified>" << row[5] << "</dct:modified>" << endl;
     auto abstract=htmlutils::convert_html_summary_to_ascii("<summary>"+row[3]+"</summary>",74,6);
     strutils::trim(abstract);
-    std::cout << "      <dct:abstract>" << abstract << "</dct:abstract>" << std::endl;
-    std::cout << "    </csw:Record>" << std::endl;
+    cout << "      <dct:abstract>" << abstract << "</dct:abstract>" << endl;
+    cout << "    </csw:Record>" << endl;
   }
-  std::cout << "  </csw:SearchResults>" << std::endl;
-  std::cout << "</csw:" << response_root() << "Response>" << std::endl;
+  cout << "  </csw:SearchResults>" << endl;
+  cout << "</csw:" << response_root() << "Response>" << endl;
 }
 
 void get_records()
@@ -538,13 +542,13 @@ void get_records()
   if (!start_position_s.empty()) {
     start_position=std::stoi(start_position_s)-1;
   }
-  MySQL::Server server("rda-db.ucar.edu","metadata","metadata","");
+  Server server("rda-db.ucar.edu","metadata","metadata","");
   if (!server) {
     print_exception_report("NoApplicableCode","","Database connection failure");
   }
   if (result_type == "hits") {
-    MySQL::LocalQuery query;
-    MySQL::Row row;
+    LocalQuery query;
+    Row row;
     std::stringstream qspec;
     qspec << "select count(x.`dc:identifier1`) from (select concat('edu.ucar.rda:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,s.summary as `dct:abstract`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified` from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H')";
     if (!constraint.predicate.empty()) {
@@ -553,15 +557,15 @@ void get_records()
     qspec << ") as x";
     query.set(qspec.str());
     if (query.submit(server) < 0 || !query.fetch_row(row)) {
-      std::cerr << "CSW Server Error (hits) - " << query.show() << std::endl;
+      std::cerr << "CSW Server Error (hits) - " << query.show() << endl;
       process_query_error(query.error());
     }
-    std::cout << "Content-type: application/xml" << std::endl << std::endl;
-    std::cout << "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" << std::endl;
-    std::cout << "<csw:" << response_root() << "Response xmlns:csw=\"http://www.opengis.net/cat/csw/2.0.2\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.opengis.net/cat/csw/2.0.2 http://schemas.opengis.net/csw/2.0.2/CSW-discovery.xsd\">" << std::endl;
-    std::cout << "  <csw:SearchStatus timestamp=\"" << dateutils::current_date_time().to_string("%ISO8601") << "\" />" << std::endl;
-    std::cout << "  <csw:SearchResults elementSet=\"" << element_set_name << "\" numberOfRecordsMatched=\"" << row[0] << "\" numberOfRecordsReturned=\"0\" nextRecord=\"1\" />" << std::endl;
-    std::cout << "</csw:" << response_root() << "Response>" << std::endl;
+    cout << "Content-type: application/xml" << endl << endl;
+    cout << "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" << endl;
+    cout << "<csw:" << response_root() << "Response xmlns:csw=\"http://www.opengis.net/cat/csw/2.0.2\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://www.opengis.net/cat/csw/2.0.2 http://schemas.opengis.net/csw/2.0.2/CSW-discovery.xsd\">" << endl;
+    cout << "  <csw:SearchStatus timestamp=\"" << dateutils::current_date_time().to_string("%ISO8601") << "\" />" << endl;
+    cout << "  <csw:SearchResults elementSet=\"" << element_set_name << "\" numberOfRecordsMatched=\"" << row[0] << "\" numberOfRecordsReturned=\"0\" nextRecord=\"1\" />" << endl;
+    cout << "</csw:" << response_root() << "Response>" << endl;
   }
   else {
     if (element_set_name == "summary") {
@@ -644,8 +648,8 @@ int main(int argc,char **argv)
     for (const auto& dc_queryable : DUBLIN_CORE_QUERYABLES) {
       tdoc.add_repeat("__DUBLIN_CORE_QUERYABLE__",dc_queryable);
     }
-    std::cout << "Content-type: application/xml" << std::endl << std::endl;
-    std::cout << tdoc << std::endl;
+    cout << "Content-type: application/xml" << endl << endl;
+    cout << tdoc << endl;
   }
   else if (request == strutils::to_lower("GetRecords")) {
     get_records();
