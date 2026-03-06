@@ -10,29 +10,35 @@
 #include <datetime.hpp>
 #include <web/web.hpp>
 #include <tokendoc.hpp>
+#include <metadata.hpp>
 #include <metadata_export.hpp>
 #include <myerror.hpp>
 
 using namespace PostgreSQL;
 using std::cout;
 using std::endl;
+using std::string;
+using std::stringstream;
 
-std::string myerror="";
-std::string mywarning="";
+metautils::Directives metautils::directives;
+metautils::Args metautils::args;
+string myerror="";
+string myoutput="";
+string mywarning="";
 
 struct Constraint {
   Constraint() : predicate(),format_index(-1),subject_index(-1),contains_format(false),contains_subject(false) {}
 
-  std::string predicate;
+  string predicate;
   int format_index,subject_index;
   bool contains_format,contains_subject;
 } constraint;
-std::string request;
+string request;
 QueryString query_string;
 
-const std::unordered_map<std::string,std::string> TYPE_NAMES{{"csw:Record","http://www.opengis.net/cat/csw/2.0.2"}};
-const std::unordered_set<std::string> OUTPUT_FORMATS{"application/xml"};
-const std::unordered_set<std::string> CONSTRAINTLANGUAGES{"CQL_TEXT"};
+const std::unordered_map<string,string> TYPE_NAMES{{"csw:Record","http://www.opengis.net/cat/csw/2.0.2"}};
+const std::unordered_set<string> OUTPUT_FORMATS{"application/xml"};
+const std::unordered_set<string> CONSTRAINTLANGUAGES{"CQL_TEXT"};
 /* mappings of queryables to RDA metadata database
 **
 ** dc:title -> search.datasets.title
@@ -54,9 +60,9 @@ const std::unordered_set<std::string> CONSTRAINTLANGUAGES{"CQL_TEXT"};
 ** dc:rights
 **
 */
-const std::unordered_set<std::string> DUBLIN_CORE_QUERYABLES{"dc:title","dc:type","dc:identifier","dct:modified","dct:abstract","dc:subject","dc:format"};
+const std::unordered_set<string> DUBLIN_CORE_QUERYABLES{"dc:title","dc:type","dc:identifier","dct:modified","dct:abstract","dc:subject","dc:format"};
 
-void print_exception_report(std::string exception_code,std::string locator,std::string exception_text = "")
+void print_exception_report(string exception_code,string locator,string exception_text = "")
 {
   cout << "Content-type: application/xml" << endl << endl;
   cout << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" << endl;
@@ -73,19 +79,18 @@ void print_exception_report(std::string exception_code,std::string locator,std::
   exit(1);
 }
 
-void process_query_error(std::string query_error)
+void process_query_error(string query_error)
 {
   if (std::regex_search(query_error,std::regex("syntax"))) {
     print_exception_report("NoApplicableCode","","Database query syntax error");
-  }
-  else {
+  } else {
     print_exception_report("NoApplicableCode","","Database query failure");
   }
 }
 
-std::string post_xml_to_query(std::string xml)
+string post_xml_to_query(string xml)
 {
-  std::unordered_map<std::string,std::vector<std::string>> kvp_list;
+  std::unordered_map<string,std::vector<string>> kvp_list;
   size_t idx=0;
   if (std::regex_search(xml,std::regex("^<\\?xml "))) {
     idx=xml.find("?>");
@@ -96,56 +101,53 @@ std::string post_xml_to_query(std::string xml)
   }
   auto root_element=xmls.root_element();
   request=strutils::to_lower(root_element.name());
-  if ( (idx=request.find(":")) != std::string::npos) {
+  if ( (idx=request.find(":")) != string::npos) {
     request=request.substr(idx+1);
   }
-  kvp_list.emplace("REQUEST",std::vector<std::string>{request});
-  kvp_list.emplace("service",std::vector<std::string>{strutils::to_lower(root_element.attribute_value("service"))});
+  kvp_list.emplace("REQUEST",std::vector<string>{request});
+  kvp_list.emplace("service",std::vector<string>{strutils::to_lower(root_element.attribute_value("service"))});
   if (request == "getcapabilities") {
     auto elist=xmls.element_list(root_element.name()+"/ows:AcceptVersions/ows:Version");
     if (elist.size() > 0) {
-      kvp_list.emplace("version",std::vector<std::string>());
+      kvp_list.emplace("version",std::vector<string>());
       for (const auto& e : elist) {
         kvp_list["version"].emplace_back(e.content());
       }
     }
     elist=xmls.element_list(root_element.name()+"/ows:AcceptFormats/ows:OutputFormat");
     if (elist.size() > 0) {
-      kvp_list.emplace("outputFormat",std::vector<std::string>());
+      kvp_list.emplace("outputFormat",std::vector<string>());
       for (const auto& e : elist) {
         kvp_list["outputFormat"].emplace_back(e.content());
       }
     }
-  }
-  else if (request == "getrecords") {
-    kvp_list.emplace("version",std::vector<std::string>{root_element.attribute_value("version")});
-    kvp_list.emplace("resultType",std::vector<std::string>{root_element.attribute_value("resultType")});
+  } else if (request == "getrecords") {
+    kvp_list.emplace("version",std::vector<string>{root_element.attribute_value("version")});
+    kvp_list.emplace("resultType",std::vector<string>{root_element.attribute_value("resultType")});
     auto query_element=root_element.element("Query");
     if (!query_element.name().empty()) {
       auto type_names=strutils::split(query_element.attribute_value("typeNames"));
-      kvp_list.emplace("typeNames",std::vector<std::string>());
+      kvp_list.emplace("typeNames",std::vector<string>());
       for (const auto& type_name : type_names) {
         if (!std::regex_search(type_name,std::regex(".+:.+"))) {
           kvp_list["typeNames"].emplace_back("csw:"+type_name);
-        }
-        else {
+        } else {
           kvp_list["typeNames"].emplace_back(type_name);
         }
       }
       auto element_set_names=query_element.element_list("ElementSetName");
-      kvp_list.emplace("elementSetName",std::vector<std::string>());
+      kvp_list.emplace("elementSetName",std::vector<string>());
       for (const auto& e : element_set_names) {
         kvp_list["elementSetName"].emplace_back(e.content());
       }
       auto constraint_element=query_element.element("Constraint");
       if (!constraint_element.name().empty()) {
         if (constraint_element.element_addresses().front().p->name() == "CqlText") {
-          kvp_list.emplace("CONSTRAINTLANGUAGE",std::vector<std::string>{"CQL_TEXT"});
-          kvp_list.emplace("Constraint",std::vector<std::string>{constraint_element.element_addresses().front().p->content()});
-        }
-        else if (constraint_element.element_addresses().front().p->name() == "ogc:Filter") {
-          kvp_list.emplace("CONSTRAINTLANGUAGE",std::vector<std::string>{"CQL_TEXT"});
-          std::unordered_map<std::string,std::string> comparison_operators{{"EqualTo"," = "},{"NotEqualTo"," != "},{"LessThan"," < "},{"GreaterThan"," > "},{"LessThanEqualTo"," <= "},{"GreaterThanEqualTo"," >= "},{"Like"," like "}};
+          kvp_list.emplace("CONSTRAINTLANGUAGE",std::vector<string>{"CQL_TEXT"});
+          kvp_list.emplace("Constraint",std::vector<string>{constraint_element.element_addresses().front().p->content()});
+        } else if (constraint_element.element_addresses().front().p->name() == "ogc:Filter") {
+          kvp_list.emplace("CONSTRAINTLANGUAGE",std::vector<string>{"CQL_TEXT"});
+          std::unordered_map<string,string> comparison_operators{{"EqualTo"," = "},{"NotEqualTo"," != "},{"LessThan"," < "},{"GreaterThan"," > "},{"LessThanEqualTo"," <= "},{"GreaterThanEqualTo"," >= "},{"Like"," like "}};
           auto ogc_filter_element=constraint_element.element("ogc:Filter");
           if (std::regex_search(ogc_filter_element.element_addresses().front().p->name(),std::regex("^ogc:PropertyIs"))) {
             auto p=ogc_filter_element.element_addresses().front().p;
@@ -155,35 +157,33 @@ std::string post_xml_to_query(std::string xml)
             if (comparison_op == "Like") {
               literal="%"+literal+"%";
             }
-            kvp_list.emplace("Constraint",std::vector<std::string>{property_name+comparison_operators[comparison_op]+"'"+literal+"'"});
+            kvp_list.emplace("Constraint",std::vector<string>{property_name+comparison_operators[comparison_op]+"'"+literal+"'"});
           }
-        }
-        else {
+        } else {
           print_exception_report("NoApplicableCode","Constraint","Invalid constraint XML");
         }
       }
     }
-  }
-  else if (request == "getrecordbyid") {
-    kvp_list.emplace("version",std::vector<std::string>{root_element.attribute_value("version")});
-    kvp_list.emplace("resultType",std::vector<std::string>{root_element.attribute_value("resultType")});
+  } else if (request == "getrecordbyid") {
+    kvp_list.emplace("version",std::vector<string>{root_element.attribute_value("version")});
+    kvp_list.emplace("resultType",std::vector<string>{root_element.attribute_value("resultType")});
     auto id_list=root_element.element_list("Id");
     if (id_list.size() == 0) {
       print_exception_report("MissingParameterValue","Id");
     }
-    kvp_list.emplace("Id",std::vector<std::string>());
+    kvp_list.emplace("Id",std::vector<string>());
     for (const auto& id : id_list) {
       kvp_list["Id"].emplace_back(id.content());
     }
     auto element_set_names=root_element.element_list("ElementSetName");
     if (element_set_names.size() > 0) {
-      kvp_list.emplace("elementSetName",std::vector<std::string>());
+      kvp_list.emplace("elementSetName",std::vector<string>());
       for (const auto& e : element_set_names) {
         kvp_list["elementSetName"].emplace_back(e.content());
       }
     }
   }
-  std::string query;
+  string query;
   for (const auto& kvp : kvp_list) {
     if (!query.empty()) {
       query+="&";
@@ -219,25 +219,21 @@ void parse_query()
     auto service=strutils::to_lower(query_string.value("service"));
     if (service.empty()) {
       print_exception_report("MissingParameterValue","service");
-    }
-    else if (service != "csw") {
+    } else if (service != "csw") {
       print_exception_report("InvalidParameterValue","service");
     }
-  }
-  else {
+  } else {
     print_exception_report("MissingParameterValue","REQUEST");
   }
 }
 
-std::string response_root()
+string response_root()
 {
   if (request == strutils::to_lower("getrecords")) {
     return "GetRecords";
-  }
-  else if (request == strutils::to_lower("getrecordbyid")) {
+  } else if (request == strutils::to_lower("getrecordbyid")) {
     return "GetRecordById";
-  }
-  else {
+  } else {
     return "";
   }
 }
@@ -246,7 +242,7 @@ void get_summary_records(Server& server,size_t max_records)
 {
   LocalQuery query;
   Row row;
-  std::stringstream qspec;
+  stringstream qspec;
 
   if (constraint.contains_format || constraint.contains_subject) {
     int next=6;
@@ -307,8 +303,7 @@ std::cerr << query.show() << endl;
       for (auto& p : sp) {
         cout << "      <dc:subject>" << p << "</dc:subject>" << endl;
       }
-    }
-    else {
+    } else {
       LocalQuery query2;
       query2.set("keyword","search.variables","dsid = '"+row[0]+"' and vocabulary = 'GCMD'");
       if (query2.submit(server) == 0) {
@@ -323,8 +318,7 @@ std::cerr << query.show() << endl;
       for (auto& p : sp) {
         cout << "      <dc:format>" << p << "</dc:format>" << endl;
       }
-    }
-    else {
+    } else {
       LocalQuery query2;
       query2.set("keyword","search.formats","dsid = '"+row[0]+"'");
       if (query2.submit(server) == 0) {
@@ -348,7 +342,7 @@ void get_brief_records(Server& server,size_t max_records)
 {
   LocalQuery query;
   Row row;
-  std::stringstream qspec;
+  stringstream qspec;
 
   qspec << "select s.dsid,concat('edu.ucar.rda:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified` from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H')";
   if (!constraint.predicate.empty()) {
@@ -373,7 +367,7 @@ void get_brief_records(Server& server,size_t max_records)
     }
     cout << "      <dc:title>" << row[2] << "</dc:title>" << endl;
     cout << "      <dc:type>Dataset</dc:type>" << endl;
-    static Server geo_server("rda-db.ucar.edu","metadata","metadata","");
+    static Server geo_server(metautils::directives.metadb_config);
     XMLDocument xdoc("/data/web/datasets/ds"+row[0]+"/metadata/dsOverview.xml");
     double min_west_lon,min_south_lat,max_east_lon,max_north_lat;
     bool is_grid;
@@ -381,16 +375,14 @@ void get_brief_records(Server& server,size_t max_records)
     if (min_west_lon < 9999.) {
       if (min_west_lon > 180.) {
         min_west_lon-=360.;
-      }
-      else if (min_west_lon < -180.) {
+      } else if (min_west_lon < -180.) {
         min_west_lon+=360.;
       }
     }
     if (max_east_lon > -9999.) {
       if (max_east_lon > 180.) {
         max_east_lon-=360.;
-      }
-      else if (max_east_lon < -180.) {
+      } else if (max_east_lon < -180.) {
         max_east_lon+=360.;
       }
     }
@@ -406,7 +398,7 @@ void get_brief_records(Server& server,size_t max_records)
 
 void get_full_records(Server& server,size_t max_records)
 {
-  std::stringstream qspec;
+  stringstream qspec;
   qspec << "select s.dsid,concat('edu.ucar.rda:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,s.summary as `dct:abstract`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified` from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H')";
   if (!constraint.predicate.empty()) {
     qspec << " having (" << constraint.predicate << ")";
@@ -461,29 +453,25 @@ void get_records()
   auto version=query_string.value("version");
   if (version.empty()) {
     print_exception_report("MissingParameterValue","version");
-  }
-  else if (version != "2.0.2") {
+  } else if (version != "2.0.2") {
     print_exception_report("InvalidParameterValue","version");
   }
   auto element_set_name=query_string.value("ElementSetName");
   if (element_set_name.empty()) {
     element_set_name="summary";
-  }
-  else if (element_set_name != "brief" && element_set_name != "summary" && element_set_name != "full") {
+  } else if (element_set_name != "brief" && element_set_name != "summary" && element_set_name != "full") {
     print_exception_report("InvalidParametervalue","ElementSetName");
   }
   auto result_type=query_string.value("resultType");
   if (result_type.empty()) {
     result_type="hits";
-  }
-  else if (result_type != "hits" && result_type != "results") {
+  } else if (result_type != "hits" && result_type != "results") {
     print_exception_report("InvalidParameterValue","resultType");
   }
   auto type_names=strutils::to_lower(query_string.value("typeNames"));
   if (type_names.empty()) {
     print_exception_report("MissingParameterValue","typeNames");
-  }
-  else if (type_names != strutils::to_lower("csw:Record")) {
+  } else if (type_names != strutils::to_lower("csw:Record")) {
     print_exception_report("InvalidParameterValue","typeNames");
   }
   auto constraint_language=strutils::to_lower(query_string.value("CONSTRAINTLANGUAGE"));
@@ -508,7 +496,7 @@ void get_records()
       strutils::replace_all(constraint.predicate,"dc:format","`dc:format`");
       strutils::replace_all(constraint.predicate,"dc:subject","`dc:subject`");
       if (std::regex_search(constraint.predicate,std::regex("csw:anytext"))) {
-        std::stringstream p;
+        stringstream p;
         p << "(" << strutils::substitute(constraint.predicate,"csw:anytext","dc:identifier") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext","`dc:title`") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext","`dct:abstract`") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext","`dct:modified`") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext","`dc:type`") << ") or (" <<  strutils::substitute(constraint.predicate,"csw:anytext","`dc:format`") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext","`dc:subject`") << ")";
         constraint.contains_format=true;
         constraint.contains_subject=true;
@@ -542,14 +530,14 @@ void get_records()
   if (!start_position_s.empty()) {
     start_position=std::stoi(start_position_s)-1;
   }
-  Server server("rda-db.ucar.edu","metadata","metadata","");
+  Server server(metautils::directives.metadb_config);
   if (!server) {
     print_exception_report("NoApplicableCode","","Database connection failure");
   }
   if (result_type == "hits") {
     LocalQuery query;
     Row row;
-    std::stringstream qspec;
+    stringstream qspec;
     qspec << "select count(x.`dc:identifier1`) from (select concat('edu.ucar.rda:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,s.summary as `dct:abstract`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified` from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H')";
     if (!constraint.predicate.empty()) {
       qspec << " having (" << constraint.predicate << ")";
@@ -566,15 +554,12 @@ void get_records()
     cout << "  <csw:SearchStatus timestamp=\"" << dateutils::current_date_time().to_string("%ISO8601") << "\" />" << endl;
     cout << "  <csw:SearchResults elementSet=\"" << element_set_name << "\" numberOfRecordsMatched=\"" << row[0] << "\" numberOfRecordsReturned=\"0\" nextRecord=\"1\" />" << endl;
     cout << "</csw:" << response_root() << "Response>" << endl;
-  }
-  else {
+  } else {
     if (element_set_name == "summary") {
       get_summary_records(server,max_records);
-    }
-    else if (element_set_name == "brief") {
+    } else if (element_set_name == "brief") {
       get_brief_records(server,max_records);
-    }
-    else if (element_set_name == "full") {
+    } else if (element_set_name == "full") {
       get_full_records(server,max_records);
     }
   }
@@ -588,7 +573,7 @@ void get_record_by_id()
     print_exception_report("MissingParameterValue","Id");
   }
   auto ids=strutils::split(id,",");
-  std::string constraint;
+  string constraint;
   for (const auto& id : ids) {
     if (!constraint.empty()) {
       constraint+=" or ";
@@ -599,9 +584,9 @@ void get_record_by_id()
   get_records();
 }
 
-int main(int argc,char **argv)
-{
+int main(int argc, char **argv) {
   parse_query();
+  metautils::read_config("csw", "", false);
   if (request == strutils::to_lower("GetCapabilities")) {
     auto version_list=query_string.value("AcceptVersions");
     bool supported_version=true;
@@ -625,13 +610,11 @@ int main(int argc,char **argv)
         auto l=strutils::to_lower(s);
         if (l == "serviceidentification") {
           tdoc.add_if("__PRINT_SERVICE_IDENTIFICATION__");
-        }
-        else if (l == "operationsmetadata") {
+        } else if (l == "operationsmetadata") {
           tdoc.add_if("__PRINT_OPERATIONS_METADATA__");
         }
       }
-    }
-    else {
+    } else {
       tdoc.add_if("__PRINT_SERVICE_IDENTIFICATION__");
       tdoc.add_if("__PRINT_OPERATIONS_METADATA__");
     }
@@ -650,14 +633,11 @@ int main(int argc,char **argv)
     }
     cout << "Content-type: application/xml" << endl << endl;
     cout << tdoc << endl;
-  }
-  else if (request == strutils::to_lower("GetRecords")) {
+  } else if (request == strutils::to_lower("GetRecords")) {
     get_records();
-  }
-  else if (request == strutils::to_lower("GetRecordById")) {
+  } else if (request == strutils::to_lower("GetRecordById")) {
     get_record_by_id();
-  }
-  else {
+  } else {
     print_exception_report("InvalidParameterValue","REQUEST");
   }
 }
