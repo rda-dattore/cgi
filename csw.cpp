@@ -257,7 +257,7 @@ void get_summary_records(Server& server,size_t max_records)
     }
     qspec << ",x.`dc:type` from (";
   }
-  qspec << "select s.dsid as dsid,concat('edu.ucar.rda:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,s.summary as `dct:abstract`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified`";
+  qspec << "select s.dsid as dsid,concat('edu.ucar.gdex:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,s.summary as `dct:abstract`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified`";
   if (constraint.contains_format) {
     qspec << ",f.keyword as `dc:format`";
   }
@@ -344,7 +344,7 @@ void get_brief_records(Server& server,size_t max_records)
   Row row;
   stringstream qspec;
 
-  qspec << "select s.dsid,concat('edu.ucar.rda:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified` from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H')";
+  qspec << "select s.dsid,concat('edu.ucar.gdex:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified` from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H')";
   if (!constraint.predicate.empty()) {
     qspec << " having (" << constraint.predicate << ")";
   }
@@ -399,7 +399,7 @@ void get_brief_records(Server& server,size_t max_records)
 void get_full_records(Server& server,size_t max_records)
 {
   stringstream qspec;
-  qspec << "select s.dsid,concat('edu.ucar.rda:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,s.summary as `dct:abstract`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified` from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H')";
+  qspec << "select s.dsid,concat('edu.ucar.gdex:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,s.summary as `dct:abstract`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified` from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H')";
   if (!constraint.predicate.empty()) {
     qspec << " having (" << constraint.predicate << ")";
   }
@@ -538,7 +538,7 @@ void get_records()
     LocalQuery query;
     Row row;
     stringstream qspec;
-    qspec << "select count(x.`dc:identifier1`) from (select concat('edu.ucar.rda:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,s.summary as `dct:abstract`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified` from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H')";
+    qspec << "select count(x.`dc:identifier1`) from (select concat('edu.ucar.gdex:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,s.summary as `dct:abstract`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified` from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H')";
     if (!constraint.predicate.empty()) {
       qspec << " having (" << constraint.predicate << ")";
     }
