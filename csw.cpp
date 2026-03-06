@@ -602,7 +602,7 @@ int main(int argc, char **argv) {
     if (!supported_version) {
       print_exception_report("VersionNegotiationFailed","");
     }
-    TokenDocument tdoc("/usr/local/www/server_root/web/html/csw/capabilities.xml");
+    TokenDocument tdoc("/data/web/html/csw/capabilities.xml");
     auto section_list=query_string.value("Sections");
     if (!section_list.empty()) {
       auto sections=strutils::split(section_list,",");
