@@ -201,8 +201,7 @@ cout << query << endl;
   return query;
 }
 
-void parse_query()
-{
+void parse_query() {
   query_string.fill(QueryString::GET);
   if (!query_string) {
     auto xml_request=webutils::cgi::post_data();
@@ -489,24 +488,24 @@ void get_records()
       }
       constraint.contains_format=std::regex_search(constraint.predicate,std::regex("dc:format"));
       constraint.contains_subject=std::regex_search(constraint.predicate,std::regex("dc:subject"));
-      strutils::replace_all(constraint.predicate,"dc:title","`dc:title`");
-      strutils::replace_all(constraint.predicate,"dct:abstract","`dct:abstract`");
-      strutils::replace_all(constraint.predicate,"dct:modified","`dct:modified`");
-      strutils::replace_all(constraint.predicate,"dc:type","`dc:type`");
-      strutils::replace_all(constraint.predicate,"dc:format","`dc:format`");
-      strutils::replace_all(constraint.predicate,"dc:subject","`dc:subject`");
+      strutils::replace_all(constraint.predicate,"dc:title",R"("dc:title")");
+      strutils::replace_all(constraint.predicate,"dct:abstract",R"("dct:abstract")");
+      strutils::replace_all(constraint.predicate,"dct:modified",R"("dct:modified")");
+      strutils::replace_all(constraint.predicate,"dc:type",R"("dc:type")");
+      strutils::replace_all(constraint.predicate,"dc:format",R"("dc:format")");
+      strutils::replace_all(constraint.predicate,"dc:subject",R"("dc:subject")");
       if (std::regex_search(constraint.predicate,std::regex("csw:anytext"))) {
         stringstream p;
-        p << "(" << strutils::substitute(constraint.predicate,"csw:anytext","dc:identifier") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext","`dc:title`") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext","`dct:abstract`") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext","`dct:modified`") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext","`dc:type`") << ") or (" <<  strutils::substitute(constraint.predicate,"csw:anytext","`dc:format`") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext","`dc:subject`") << ")";
+        p << "(" << strutils::substitute(constraint.predicate,"csw:anytext","dc:identifier") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext",R"("dc:title")") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext",R"("dct:abstract")") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext",R"("dct:modified")") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext",R"("dc:type")") << ") or (" <<  strutils::substitute(constraint.predicate,"csw:anytext",R"("dc:format")") << ") or (" << strutils::substitute(constraint.predicate,"csw:anytext",R"("dc:subject")") << ")";
         constraint.contains_format=true;
         constraint.contains_subject=true;
         constraint.predicate=p.str();
       }
       if (std::regex_search(constraint.predicate,std::regex("dc:identifier"))) {
         auto p1=constraint.predicate;
-        strutils::replace_all(p1,"dc:identifier","`dc:identifier1`");
+        strutils::replace_all(p1,"dc:identifier",R"("dc:identifier1")");
         auto p2=constraint.predicate;
-        strutils::replace_all(p2,"dc:identifier","`dc:identifier2`");
+        strutils::replace_all(p2,"dc:identifier",R"("dc:identifier2")");
         constraint.predicate="("+p1+") or ("+p2+")";
       }
     }
@@ -538,7 +537,7 @@ void get_records()
     LocalQuery query;
     Row row;
     stringstream qspec;
-    qspec << "select count(x.`dc:identifier1`) from (select concat('edu.ucar.gdex:ds',s.dsid) as `dc:identifier1`,s.title as `dc:title`,s.summary as `dct:abstract`,concat('doi:',v.doi) as `dc:identifier2`,d.date_change as `dct:modified` from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H')";
+    qspec << R"(select count(x."dc:identifier1") from (select concat('edu.ucar.gdex:ds',s.dsid) as "dc:identifier1",s.title as "dc:title",s.summary as "dct:abstract",concat('doi:',v.doi) as "dc:identifier2",d.date_change as "dct:modified" from search.datasets as s left join dssdb.dsvrsn as v on v.dsid = concat('ds',s.dsid) and v.status = 'A' left join dssdb.dataset as d on d.dsid = concat('ds',s.dsid) where (s.type = 'P' or s.type = 'H'))";
     if (!constraint.predicate.empty()) {
       qspec << " having (" << constraint.predicate << ")";
     }
@@ -587,7 +586,7 @@ void get_record_by_id()
 int main(int argc, char **argv) {
   parse_query();
   metautils::read_config("csw", "", false);
-  if (request == strutils::to_lower("GetCapabilities")) {
+  if (request == "GetCapabilities") {
     auto version_list=query_string.value("AcceptVersions");
     bool supported_version=true;
     auto versions=strutils::split(version_list,",");
